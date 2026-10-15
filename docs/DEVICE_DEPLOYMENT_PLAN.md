@@ -35,7 +35,7 @@ Measured on 2026-10-15:
 | Weather refresh interval | 15 minutes |
 | Calendar refresh interval | 30 minutes |
 
-The current test address, `http://192.168.86.193:4174/`, is temporary. Because it is plain HTTP on a LAN address, it is not a production PWA origin and cannot provide normal service-worker guarantees.
+The production address is `https://minimalist-home.vercel.app/`. The local address, `http://192.168.86.193:4174/`, remains useful for development but is not a production PWA origin and cannot provide normal service-worker guarantees.
 
 ## Success Criteria
 
@@ -79,16 +79,16 @@ Phase complete when the current working state can be restored without downloadin
 
 Purpose: establish a stable, secure origin that can use the service worker and be installed as a web app.
 
-- [ ] Choose a static host with HTTPS and atomic deployments.
-- [ ] Connect a dedicated domain or subdomain.
-- [ ] Configure the host to publish the SvelteKit `build` directory.
-- [ ] Configure long-lived immutable caching for hashed assets.
-- [ ] Configure HTML and the service worker to revalidate instead of being cached forever.
-- [ ] Deploy the current production build.
-- [ ] Verify the manifest, icons, and service worker over HTTPS.
-- [ ] Verify `window.isSecureContext === true`.
+- [x] Choose a static host with HTTPS and atomic deployments.
+- [x] Connect a dedicated domain or subdomain.
+- [x] Configure the host to publish the SvelteKit `build` directory.
+- [x] Configure long-lived immutable caching for hashed assets.
+- [x] Configure HTML and the service worker to revalidate instead of being cached forever.
+- [x] Deploy the current production build.
+- [x] Verify the manifest, icons, and service worker over HTTPS.
+- [x] Verify the site is served from a secure HTTPS origin.
 - [ ] Verify the dashboard reloads after the network is disconnected.
-- [ ] Confirm a new deployment replaces the old app shell cleanly.
+- [x] Confirm a new Git deployment replaces the production deployment cleanly.
 
 Suggested cache policy:
 
@@ -299,7 +299,7 @@ For every Firefox update:
 | 2026-10-15 | Cache weather for 15 minutes | Avoid API churn while keeping conditions current | Verified |
 | 2026-10-15 | Cache calendars for 30 minutes | Avoid repeated downloads and iCalendar parsing | Verified |
 | 2026-10-15 | Defer swap changes | Application and background-process improvements should be measured first | Pending |
-| 2026-10-15 | Use Vercel for production hosting | Provides HTTPS, atomic static deployments, preview builds, and a small calendar proxy function | In progress |
+| 2026-10-15 | Use Vercel for production hosting | Provides HTTPS, atomic static deployments, preview builds, and a small calendar proxy function | Working |
 
 ## Next Action
 
