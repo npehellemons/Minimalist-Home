@@ -5,6 +5,10 @@ script only starts Firefox after boot, suppresses the vendor launcher, keeps
 the display awake, enters fullscreen, and reopens Firefox if Android kills its
 process.
 
+The launcher restores Firefox's selected tab instead of sending the production
+URL on every start. Sending an `ACTION_VIEW` URL would create a duplicate tab
+after every boot or recovery.
+
 ## Install
 
 1. Connect the frame with USB debugging enabled.

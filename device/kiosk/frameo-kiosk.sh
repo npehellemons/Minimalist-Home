@@ -1,7 +1,7 @@
 #!/system/bin/sh
 
-URL="https://minimalist-home.vercel.app/"
 FIREFOX_PACKAGE="org.mozilla.firefox"
+FIREFOX_ACTIVITY="org.mozilla.fenix.HomeActivity"
 FRAMEO_PACKAGE="net.frameo.frame"
 LOG_FILE="/data/local/tmp/minimalist-home-kiosk.log"
 
@@ -32,14 +32,17 @@ enter_dashboard_fullscreen() {
   # The first tap opens the app's screensaver and requests browser fullscreen.
   # The second tap returns to the dashboard while retaining fullscreen.
   sleep 15
-  input tap 40 168
+  input tap 136 228
   sleep 2
   input tap 640 400
 }
 
 launch_dashboard() {
-  log "Launching dashboard in Firefox"
-  am start -W -a android.intent.action.VIEW -d "$URL" -p "$FIREFOX_PACKAGE" >> "$LOG_FILE" 2>&1
+  log "Restoring the selected Firefox tab"
+  am start -W \
+    -a android.intent.action.MAIN \
+    -c android.intent.category.LAUNCHER \
+    -n "$FIREFOX_PACKAGE/$FIREFOX_ACTIVITY" >> "$LOG_FILE" 2>&1
   enter_dashboard_fullscreen
 }
 
