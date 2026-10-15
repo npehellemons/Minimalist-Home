@@ -214,6 +214,11 @@ Purpose: make the tablet recover without human intervention.
 - [ ] Reboot the tablet weekly only if it improves measured stability.
 - [ ] Provide a maintenance escape path for ADB and settings access.
 
+Implementation lives in `device/kiosk/`. The firmware's existing
+`install-recovery.sh` init hook starts a root-owned watchdog without packaging
+the dashboard as an Android application. Run `device/kiosk/restore.sh` over ADB
+to remove it and restore Frameo.
+
 Android lock-task mode is the strongest kiosk option, but on Android 8.1 it requires device-owner/DPC setup for a fully managed device. First determine whether the installed Firefox web app plus root boot automation is sufficient before adding a custom DPC.
 
 Phase complete after power loss, Wi-Fi loss, browser termination, and server outage have each been tested successfully.
