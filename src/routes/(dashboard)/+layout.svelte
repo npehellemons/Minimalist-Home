@@ -31,6 +31,12 @@
   });
 
   function enterScreensaver() {
+    if (!document.fullscreenElement) {
+      void document.documentElement.requestFullscreen().catch(() => {
+        // Fullscreen may be unavailable outside a direct user interaction.
+      });
+    }
+
     screensaverActive = true;
   }
 
