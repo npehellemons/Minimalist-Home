@@ -180,6 +180,156 @@ export type Database = {
           },
         ];
       };
+      task_assignments: {
+        Row: {
+          created_at: string;
+          household_id: string;
+          profile_id: string;
+          task_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          household_id: string;
+          profile_id: string;
+          task_id: string;
+        };
+        Update: {
+          created_at?: string;
+          household_id?: string;
+          profile_id?: string;
+          task_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "task_assignments_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "task_assignments_profile_id_household_id_fkey";
+            columns: ["profile_id", "household_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id", "household_id"];
+          },
+          {
+            foreignKeyName: "task_assignments_task_id_household_id_fkey";
+            columns: ["task_id", "household_id"];
+            isOneToOne: false;
+            referencedRelation: "tasks";
+            referencedColumns: ["id", "household_id"];
+          },
+        ];
+      };
+      task_completions: {
+        Row: {
+          completed_at: string;
+          completed_by: string;
+          household_id: string;
+          occurrence_date: string;
+          profile_id: string;
+          task_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          completed_at?: string;
+          completed_by?: string;
+          household_id: string;
+          occurrence_date: string;
+          profile_id: string;
+          task_id: string;
+        };
+        Update: {
+          completed_at?: string;
+          completed_by?: string;
+          household_id?: string;
+          occurrence_date?: string;
+          profile_id?: string;
+          task_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "task_completions_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "task_completions_task_id_household_id_profile_id_fkey";
+            columns: ["task_id", "household_id", "profile_id"];
+            isOneToOne: false;
+            referencedRelation: "task_assignments";
+            referencedColumns: ["task_id", "household_id", "profile_id"];
+          },
+        ];
+      };
+      tasks: {
+        Row: {
+          created_at: string;
+          created_by: string;
+          day_part: string | null;
+          description: string | null;
+          due_date: string | null;
+          due_time: string | null;
+          emoji: string | null;
+          household_id: string;
+          id: string;
+          is_active: boolean;
+          kind: string;
+          sort_order: number;
+          title: string;
+          updated_at: string;
+          weekdays: number[] | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          created_by?: string;
+          day_part?: string | null;
+          description?: string | null;
+          due_date?: string | null;
+          due_time?: string | null;
+          emoji?: string | null;
+          household_id: string;
+          id?: string;
+          is_active?: boolean;
+          kind: string;
+          sort_order?: number;
+          title: string;
+          updated_at?: string;
+          weekdays?: number[] | null;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string;
+          day_part?: string | null;
+          description?: string | null;
+          due_date?: string | null;
+          due_time?: string | null;
+          emoji?: string | null;
+          household_id?: string;
+          id?: string;
+          is_active?: boolean;
+          kind?: string;
+          sort_order?: number;
+          title?: string;
+          updated_at?: string;
+          weekdays?: number[] | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tasks_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -218,6 +368,21 @@ export type Database = {
           expires_at: string;
           invite_code: string;
         }[];
+      };
+      create_task: {
+        Args: {
+          target_household_id: string;
+          task_day_part?: string | null;
+          task_description?: string | null;
+          task_due_date?: string | null;
+          task_due_time?: string | null;
+          task_emoji?: string | null;
+          task_kind: string;
+          task_profile_ids: string[];
+          task_title: string;
+          task_weekdays?: number[] | null;
+        };
+        Returns: string;
       };
       join_household: {
         Args: {

@@ -18,7 +18,8 @@
     "db:lint": "supabase db lint --level warning",
     "db:types": "supabase gen types typescript --schema public --local > src/lib/supabase/database.types.ts",
     "test:onboarding": "node scripts/test-household-onboarding.mjs",
-    "test:invites": "node scripts/test-household-invites.mjs"
+    "test:invites": "node scripts/test-household-invites.mjs",
+    "test:tasks": "node scripts/test-household-tasks.mjs"
   },
   "dependencies": {
     "@blobatar/svelte": "^2.7.0",

@@ -24,6 +24,8 @@ pnpm db:lint
 pnpm db:types
 pnpm db:stop
 pnpm test:onboarding
+pnpm test:invites
+pnpm test:tasks
 ```
 
 For remote schema work, pull development variables with
@@ -41,3 +43,6 @@ Household invitations are now implemented. Further membership, authorization,
 account-management, and device-pairing work is parked in
 [`MEMBERSHIP_STACK_ROADMAP.md`](./MEMBERSHIP_STACK_ROADMAP.md) while development
 returns to the dashboard experience.
+
+The task data model and staged product plan are documented in
+[`TASKS_ROADMAP.md`](./TASKS_ROADMAP.md).
