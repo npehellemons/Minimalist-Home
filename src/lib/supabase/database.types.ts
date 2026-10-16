@@ -280,6 +280,7 @@ export type Database = {
           id: string;
           is_active: boolean;
           kind: string;
+          recurrence: string;
           sort_order: number;
           title: string;
           updated_at: string;
@@ -298,6 +299,7 @@ export type Database = {
           id?: string;
           is_active?: boolean;
           kind: string;
+          recurrence?: string;
           sort_order?: number;
           title: string;
           updated_at?: string;
@@ -315,6 +317,7 @@ export type Database = {
           id?: string;
           is_active?: boolean;
           kind?: string;
+          recurrence?: string;
           sort_order?: number;
           title?: string;
           updated_at?: string;
@@ -379,6 +382,7 @@ export type Database = {
           task_emoji?: string | null;
           task_kind: string;
           task_profile_ids: string[];
+          task_recurrence?: string | null;
           task_title: string;
           task_weekdays?: number[] | null;
         };

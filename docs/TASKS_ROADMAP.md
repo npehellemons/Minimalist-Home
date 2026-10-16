@@ -41,6 +41,7 @@ Implemented:
 - Keep chores due today visible in every day-part view.
 - Create a daily routine or one-time chore from a Shadcn Sheet.
 - Repeat routines every day or on selected weekdays.
+- Repeat chores daily, weekly, or monthly from a chosen start date.
 - Assign a task to one or more profiles.
 - Add an optional emoji for quick visual recognition.
 - Check and uncheck tasks with optimistic feedback.
@@ -53,7 +54,9 @@ Current deliberate limits:
 
 - The board shows today only.
 - Tasks cannot yet be edited, deleted, skipped, or reordered in the interface.
-- Chores are one-time and are shown only on their due date.
+- Chore recurrence currently uses a single start date. Weekly chores repeat on
+  that weekday; monthly chores repeat on that day number and use the last day of
+  shorter months when necessary.
 - There is no overdue filter or unassigned task column.
 
 ## Phase 2: Management
@@ -75,7 +78,7 @@ Acceptance criteria:
 ## Phase 3: Recurrence And Skip
 
 - Let one routine appear in multiple day-parts without duplicating its definition.
-- Add daily, weekly, monthly, and custom recurrence for chores.
+- Add custom recurrence intervals and selected weekdays for chores.
 - Add optional recurrence end dates.
 - Store skipped occurrences separately from completed occurrences.
 - Support complete, incomplete, skip, and unskip actions.

@@ -29,6 +29,7 @@
     setTaskCompleted,
     subscribeToTasks,
     type DailyTask,
+    type ChoreRecurrence,
     type TaskDayPart,
     type TaskKind,
   } from "#lib/tasks.js";
@@ -110,6 +111,7 @@
     dateKeyInTimeZone(initialNow, initialSettings.location.timezone),
   );
   let taskDueTime = $state("");
+  let choreRecurrence = $state<ChoreRecurrence>("none");
   let selectedProfileIds = $state<string[]>([]);
 
   let text = $derived(translations[$appSettings.language]);
@@ -183,6 +185,7 @@
     taskWeekdays = [...everyDay];
     taskDueDate = todayKey;
     taskDueTime = "";
+    choreRecurrence = "none";
     selectedProfileIds = defaultProfile ? [defaultProfile.id] : [];
     createError = "";
     createOpen = true;
@@ -227,6 +230,7 @@
           routineFrequency === "daily" ? [...everyDay] : taskWeekdays,
         dueDate: taskDueDate,
         dueTime: taskDueTime,
+        recurrence: choreRecurrence,
       });
       createOpen = false;
       await loadTasks();
@@ -451,6 +455,9 @@
                           {#if task.dueTime}
                             · {task.dueTime.slice(0, 5)}
                           {/if}
+                          {#if task.recurrence !== "none"}
+                            · {text.tasks[task.recurrence]}
+                          {/if}
                         {/if}
                       </span>
                     </span>
@@ -591,7 +598,7 @@
               </p>
             </div>
           {:else}
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid gap-3 sm:grid-cols-2">
               <div class="grid gap-2">
                 <Label for="task-due-date">{text.tasks.date}</Label>
                 <Input id="task-due-date" type="date" bind:value={taskDueDate} required />
@@ -600,6 +607,21 @@
                 <Label for="task-due-time">{text.tasks.timeOptional}</Label>
                 <Input id="task-due-time" type="time" bind:value={taskDueTime} />
               </div>
+            </div>
+
+            <div class="grid gap-2">
+              <Label>{text.tasks.repeats}</Label>
+              <Tabs.Root bind:value={choreRecurrence}>
+                <Tabs.List class="grid h-auto w-full grid-cols-2 sm:grid-cols-4">
+                  <Tabs.Trigger value="none">{text.tasks.oneTime}</Tabs.Trigger>
+                  <Tabs.Trigger value="daily">{text.tasks.daily}</Tabs.Trigger>
+                  <Tabs.Trigger value="weekly">{text.tasks.weekly}</Tabs.Trigger>
+                  <Tabs.Trigger value="monthly">{text.tasks.monthly}</Tabs.Trigger>
+                </Tabs.List>
+              </Tabs.Root>
+              <p class="text-xs text-muted-foreground">
+                {text.tasks.choreRecurrence[choreRecurrence]}
+              </p>
             </div>
           {/if}
 

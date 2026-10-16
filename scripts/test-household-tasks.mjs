@@ -120,6 +120,30 @@ try {
     throw new Error("Selected routine weekdays were not stored correctly");
   }
 
+  const { data: choreId, error: choreError } = await owner.rpc("create_task", {
+    target_household_id: householdId,
+    task_title: "Papier buiten zetten",
+    task_kind: "chore",
+    task_profile_ids: [family.id],
+    task_due_date: "2026-10-31",
+    task_recurrence: "monthly",
+  });
+  if (choreError) throw choreError;
+  if (!choreId) throw new Error("Recurring chore was not created");
+
+  const { data: chores, error: choresError } = await member
+    .from("tasks")
+    .select("id, due_date, recurrence")
+    .eq("id", choreId);
+  if (choresError) throw choresError;
+  if (
+    chores.length !== 1 ||
+    chores[0].due_date !== "2026-10-31" ||
+    chores[0].recurrence !== "monthly"
+  ) {
+    throw new Error("Recurring chore schedule was not stored correctly");
+  }
+
   const { data: assignments, error: assignmentsError } = await member
     .from("task_assignments")
     .select("profile_id")

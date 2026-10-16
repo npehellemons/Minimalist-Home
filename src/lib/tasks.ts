@@ -5,6 +5,7 @@ import type { Tables } from "#lib/supabase/database.types.js";
 
 export type TaskKind = "routine" | "chore";
 export type TaskDayPart = "morning" | "afternoon" | "evening";
+export type ChoreRecurrence = "none" | "daily" | "weekly" | "monthly";
 
 type TaskRow = Tables<"tasks">;
 type TaskAssignmentRow = Tables<"task_assignments">;
@@ -19,6 +20,7 @@ export type DailyTask = {
   kind: TaskKind;
   dayPart: TaskDayPart | null;
   dueTime: string | null;
+  recurrence: ChoreRecurrence;
   completed: boolean;
 };
 
@@ -31,6 +33,7 @@ export type CreateTaskInput = {
   weekdays?: number[];
   dueDate?: string;
   dueTime?: string;
+  recurrence?: ChoreRecurrence;
   emoji?: string;
   description?: string;
 };
@@ -56,9 +59,43 @@ function weekdayForDateKey(dateKey: string) {
   return new Date(`${dateKey}T12:00:00Z`).getUTCDay();
 }
 
+function parseDateKey(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return { year, month, day };
+}
+
+function dayDifference(fromDateKey: string, toDateKey: string) {
+  const from = parseDateKey(fromDateKey);
+  const to = parseDateKey(toDateKey);
+  return Math.round(
+    (Date.UTC(to.year, to.month - 1, to.day) -
+      Date.UTC(from.year, from.month - 1, from.day)) /
+      86_400_000,
+  );
+}
+
+function choreAppliesOnDate(task: TaskRow, dateKey: string) {
+  if (!task.due_date || dateKey < task.due_date) return false;
+
+  const recurrence = task.recurrence as ChoreRecurrence;
+  if (recurrence === "none") return task.due_date === dateKey;
+  if (recurrence === "daily") return true;
+  if (recurrence === "weekly") {
+    return dayDifference(task.due_date, dateKey) % 7 === 0;
+  }
+
+  const anchor = parseDateKey(task.due_date);
+  const target = parseDateKey(dateKey);
+  const lastDayOfTargetMonth = new Date(
+    Date.UTC(target.year, target.month, 0),
+  ).getUTCDate();
+
+  return target.day === Math.min(anchor.day, lastDayOfTargetMonth);
+}
+
 function appliesOnDate(task: TaskRow, dateKey: string, weekday: number) {
   if (!task.is_active) return false;
-  if (task.kind === "chore") return task.due_date === dateKey;
+  if (task.kind === "chore") return choreAppliesOnDate(task, dateKey);
   return task.weekdays?.includes(weekday) === true;
 }
 
@@ -117,6 +154,7 @@ export async function getDailyTasks(
           kind: task.kind as TaskKind,
           dayPart: task.day_part as TaskDayPart | null,
           dueTime: task.due_time,
+          recurrence: task.recurrence as ChoreRecurrence,
           completed: completionKeys.has(
             `${assignment.task_id}\u0000${assignment.profile_id}`,
           ),
@@ -140,6 +178,7 @@ export async function createTask(input: CreateTaskInput) {
     task_weekdays: input.kind === "routine" ? input.weekdays : null,
     task_emoji: input.emoji?.trim() || null,
     task_description: input.description?.trim() || null,
+    task_recurrence: input.kind === "chore" ? input.recurrence : "none",
   });
 
   if (error) throw error;
