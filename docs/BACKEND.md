@@ -35,8 +35,9 @@ Hosted Supabase Auth must use `https://minimalist-home.vercel.app` as its Site U
 Allow `http://localhost:5173/**`, `http://127.0.0.1:5173/**`, and the Vercel preview
 pattern in its redirect allow-list. The matching local values live in `supabase/config.toml`.
 
-## Next slice
+## Membership roadmap
 
-Persist settings edits back to Supabase and add household invitations. A later
-device-pairing flow should give the photo frame a revocable device credential rather
-than storing the owner's password on the frame.
+Household invitations are now implemented. Further membership, authorization,
+account-management, and device-pairing work is parked in
+[`MEMBERSHIP_STACK_ROADMAP.md`](./MEMBERSHIP_STACK_ROADMAP.md) while development
+returns to the dashboard experience.
