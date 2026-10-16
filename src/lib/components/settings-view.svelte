@@ -17,6 +17,15 @@
     type ColorModePreference,
     type HouseholdProfile,
   } from "#lib/app-settings.js";
+  import {
+    createCalendarSource,
+    createProfile as createHouseholdProfile,
+    deleteCalendarSource,
+    deleteProfile as deleteHouseholdProfile,
+    updateCalendarSource,
+    updateHouseholdSettings,
+    updateProfile as updateHouseholdProfile,
+  } from "#lib/household-session.js";
   import { translations } from "#lib/i18n.js";
   import * as Avatar from "#lib/components/ui/avatar/index.js";
   import { Badge } from "#lib/components/ui/badge/index.js";
@@ -34,131 +43,85 @@
   let profileColor = $state("#2563eb");
   let locationQuery = $state("");
   let locationStatus = $state<"idle" | "loading" | "saved" | "error">("idle");
+  let syncStatus = $state<"idle" | "saving" | "saved" | "error">("idle");
   let text = $derived(translations[$appSettings.language]);
 
-  function createId(prefix: string) {
-    return `${prefix}-${crypto.randomUUID()}`;
+  async function persist(action: () => Promise<unknown>) {
+    syncStatus = "saving";
+
+    try {
+      await action();
+      syncStatus = "saved";
+      return true;
+    } catch (error) {
+      console.error("Unable to save household settings", error);
+      syncStatus = "error";
+      return false;
+    }
   }
 
-  function updateCalendar(
+  async function updateCalendar(
     profileId: string,
     calendarId: string,
     patch: Partial<CalendarFeed>,
   ) {
-    appSettings.update((settings) => ({
-      ...settings,
-      profiles: settings.profiles.map((profile) =>
-        profile.id === profileId
-          ? {
-              ...profile,
-              calendars: profile.calendars.map((calendar) =>
-                calendar.id === calendarId
-                  ? { ...calendar, ...patch }
-                  : calendar,
-              ),
-            }
-          : profile,
-      ),
-    }));
+    await persist(() => updateCalendarSource(profileId, calendarId, patch));
   }
 
-  function addCalendar(event: SubmitEvent, profileId: string) {
+  async function addCalendar(event: SubmitEvent, profileId: string) {
     event.preventDefault();
 
     const name = (calendarNames[profileId] ?? "").trim();
     const url = (calendarUrls[profileId] ?? "").trim();
     if (!name || !url) return;
 
-    appSettings.update((settings) => ({
-      ...settings,
-      profiles: settings.profiles.map((profile) =>
-        profile.id === profileId
-          ? {
-              ...profile,
-              calendars: [
-                ...profile.calendars,
-                {
-                  id: createId("calendar"),
-                  name,
-                  url,
-                  enabled: true,
-                },
-              ],
-            }
-          : profile,
-      ),
-    }));
+    const saved = await persist(() =>
+      createCalendarSource(profileId, { name, url, enabled: true }),
+    );
+    if (!saved) return;
 
     calendarNames[profileId] = "";
     calendarUrls[profileId] = "";
   }
 
-  function removeCalendar(profileId: string, calendarId: string) {
-    appSettings.update((settings) => ({
-      ...settings,
-      profiles: settings.profiles.map((profile) =>
-        profile.id === profileId
-          ? {
-              ...profile,
-              calendars: profile.calendars.filter(
-                (calendar) => calendar.id !== calendarId,
-              ),
-            }
-          : profile,
-      ),
-    }));
+  async function removeCalendar(profileId: string, calendarId: string) {
+    await persist(() => deleteCalendarSource(profileId, calendarId));
   }
 
-  function updateProfile(id: string, patch: Partial<HouseholdProfile>) {
-    appSettings.update((settings) => ({
-      ...settings,
-      profiles: settings.profiles.map((profile) =>
-        profile.id === id ? { ...profile, ...patch } : profile,
-      ),
-    }));
+  async function updateProfile(id: string, patch: Partial<HouseholdProfile>) {
+    await persist(() => updateHouseholdProfile(id, patch));
   }
 
-  function addProfile(event: SubmitEvent) {
+  async function addProfile(event: SubmitEvent) {
     event.preventDefault();
 
     const name = profileName.trim();
     if (!name) return;
 
-    appSettings.update((settings) => ({
-      ...settings,
-      profiles: [
-        ...settings.profiles,
-        {
-          id: createId("profile"),
-          name,
-          avatar: profileAvatar.trim() || name.slice(0, 1).toUpperCase(),
-          color: profileColor,
-          family: false,
-          calendars: [],
-        },
-      ],
-    }));
+    const saved = await persist(() =>
+      createHouseholdProfile({
+        name,
+        avatar: profileAvatar.trim() || name.slice(0, 1).toUpperCase(),
+        color: profileColor,
+      }),
+    );
+    if (!saved) return;
 
     profileName = "";
     profileAvatar = "";
     profileColor = "#2563eb";
   }
 
-  function removeProfile(id: string) {
-    appSettings.update((settings) => ({
-      ...settings,
-      profiles: settings.profiles.filter(
-        (profile) => profile.family || profile.id !== id,
-      ),
-    }));
+  async function removeProfile(id: string) {
+    await persist(() => deleteHouseholdProfile(id));
   }
 
-  function setLanguage(language: AppLanguage) {
-    appSettings.update((settings) => ({ ...settings, language }));
+  async function setLanguage(language: AppLanguage) {
+    await persist(() => updateHouseholdSettings({ language }));
   }
 
-  function setColorMode(colorMode: ColorModePreference) {
-    appSettings.update((settings) => ({ ...settings, colorMode }));
+  async function setColorMode(colorMode: ColorModePreference) {
+    await persist(() => updateHouseholdSettings({ colorMode }));
   }
 
   async function saveLocation(event: SubmitEvent) {
@@ -190,16 +153,15 @@
         return;
       }
 
-      locationQuery = result.name;
-      appSettings.update((settings) => ({
-        ...settings,
-        location: {
+      const location = {
           name: result.name,
           latitude: result.latitude,
           longitude: result.longitude,
           timezone: result.timezone ?? "Europe/Amsterdam",
-        },
-      }));
+      };
+      const saved = await persist(() => updateHouseholdSettings({ location }));
+      if (!saved) throw new Error("Unable to save location");
+      locationQuery = result.name;
       locationStatus = "saved";
     } catch {
       locationStatus = "error";
@@ -213,7 +175,14 @@
 
 <ScrollArea.Root class="h-full bg-muted/30">
   <div class="mx-auto grid gap-4 p-6">
-    <h2 class="text-2xl font-semibold">{text.settings.title}</h2>
+    <div class="flex items-center justify-between gap-3">
+      <h2 class="text-2xl font-semibold">{text.settings.title}</h2>
+      {#if syncStatus !== "idle"}
+        <Badge variant={syncStatus === "error" ? "destructive" : "secondary"}>
+          {text.settings[syncStatus]}
+        </Badge>
+      {/if}
+    </div>
 
     <Card.Root size="sm">
       <Card.Header class="border-b">
@@ -243,7 +212,7 @@
                 <Input
                   id={`${profile.id}-name`}
                   value={profile.name}
-                  oninput={(event) =>
+                  onchange={(event) =>
                     updateProfile(profile.id, {
                       name: event.currentTarget.value,
                     })}
@@ -257,7 +226,7 @@
                   id={`${profile.id}-avatar`}
                   maxlength={2}
                   value={profile.avatar}
-                  oninput={(event) =>
+                  onchange={(event) =>
                     updateProfile(profile.id, {
                       avatar: event.currentTarget.value,
                     })}
@@ -272,7 +241,7 @@
                   class="h-9 w-12 cursor-pointer rounded-md border bg-background p-1"
                   type="color"
                   value={profile.color}
-                  oninput={(event) =>
+                  onchange={(event) =>
                     updateProfile(profile.id, {
                       color: event.currentTarget.value,
                     })}

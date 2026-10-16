@@ -87,7 +87,48 @@ try {
   if (profiles.data.length !== 2) throw new Error("Profile import check failed");
   if (calendars.data.length !== 1) throw new Error("Calendar import check failed");
 
-  console.log("Household onboarding smoke test passed");
+  const personalProfile = profiles.data.find((profile) => profile.id);
+  if (!personalProfile) throw new Error("Profile CRUD setup failed");
+
+  const { data: createdCalendar, error: createCalendarError } = await browser
+    .from("calendar_sources")
+    .insert({
+      household_id: householdId,
+      profile_id: personalProfile.id,
+      name: "Settings test",
+      feed_url: "webcal://example.invalid/settings.ics",
+      enabled: true,
+    })
+    .select("id")
+    .single();
+  if (createCalendarError) throw createCalendarError;
+
+  const { data: updatedCalendar, error: updateCalendarError } = await browser
+    .from("calendar_sources")
+    .update({ name: "Settings test updated", enabled: false })
+    .eq("id", createdCalendar.id)
+    .select("name, enabled")
+    .single();
+  if (updateCalendarError) throw updateCalendarError;
+  if (updatedCalendar.name !== "Settings test updated" || updatedCalendar.enabled) {
+    throw new Error("Calendar update check failed");
+  }
+
+  const { error: deleteCalendarError } = await browser
+    .from("calendar_sources")
+    .delete()
+    .eq("id", createdCalendar.id);
+  if (deleteCalendarError) throw deleteCalendarError;
+
+  const { data: remainingCalendar, error: remainingCalendarError } = await browser
+    .from("calendar_sources")
+    .select("id")
+    .eq("id", createdCalendar.id)
+    .maybeSingle();
+  if (remainingCalendarError) throw remainingCalendarError;
+  if (remainingCalendar) throw new Error("Calendar delete check failed");
+
+  console.log("Household onboarding and settings CRUD smoke test passed");
 } finally {
   if (householdId) {
     await admin.from("households").delete().eq("id", householdId);

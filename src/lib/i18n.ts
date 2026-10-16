@@ -108,6 +108,9 @@ export const translations = {
       light: "Licht",
       dark: "Donker",
       enabled: "Actief",
+      saving: "Opslaan...",
+      saved: "Opgeslagen",
+      error: "Opslaan mislukt",
     },
   },
   en: {
@@ -217,6 +220,9 @@ export const translations = {
       light: "Light",
       dark: "Dark",
       enabled: "Enabled",
+      saving: "Saving...",
+      saved: "Saved",
+      error: "Could not save",
     },
   },
 } as const;

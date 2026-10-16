@@ -6,13 +6,18 @@ import {
   appSettings,
   type AppLanguage,
   type AppSettings,
+  type CalendarFeed,
   type ColorModePreference,
+  type DashboardLocation,
+  type HouseholdProfile,
 } from "#lib/app-settings.js";
 import { isSupabaseConfigured, supabase } from "#lib/supabase/client.js";
 import type { Tables } from "#lib/supabase/database.types.js";
 
 type Household = Tables<"households">;
 type Membership = Tables<"household_members">;
+type CalendarSource = Tables<"calendar_sources">;
+type Profile = Tables<"profiles">;
 
 export type HouseholdSessionStatus =
   | "loading"
@@ -41,6 +46,97 @@ const initialState: HouseholdSessionState = {
 export const householdSession = writable<HouseholdSessionState>(initialState);
 
 let loadId = 0;
+const calendarRecoveryRequests = new Map<
+  string,
+  Promise<CalendarSource[]>
+>();
+
+function calendarFeed(source: CalendarSource): CalendarFeed {
+  return {
+    id: source.id,
+    name: source.name,
+    url: source.feed_url,
+    enabled: source.enabled,
+  };
+}
+
+function householdProfile(profile: Profile, calendars: CalendarSource[]): HouseholdProfile {
+  return {
+    id: profile.id,
+    name: profile.name,
+    avatar: profile.avatar,
+    color: profile.color,
+    family: profile.is_family,
+    calendars: calendars
+      .filter((calendar) => calendar.profile_id === profile.id)
+      .map(calendarFeed),
+  };
+}
+
+function readyHousehold(): HouseholdSessionState & {
+  household: Household;
+  membership: Membership;
+} {
+  const state = get(householdSession);
+
+  if (state.status !== "ready" || !state.household || !state.membership) {
+    throw new Error("Household is not ready");
+  }
+
+  return state as HouseholdSessionState & {
+    household: Household;
+    membership: Membership;
+  };
+}
+
+async function recoverLocalCalendars(
+  householdId: string,
+  profiles: Profile[],
+  remoteCalendars: CalendarSource[],
+) {
+  const existingRequest = calendarRecoveryRequests.get(householdId);
+  if (existingRequest) return existingRequest;
+
+  const localSettings = get(appSettings);
+  const profileIds = new Set(profiles.map((profile) => profile.id));
+  const remoteFeeds = new Set(
+    remoteCalendars.map(
+      (calendar) => `${calendar.profile_id}\u0000${calendar.feed_url}`,
+    ),
+  );
+  const pendingCalendars = localSettings.profiles.flatMap((profile) =>
+    profileIds.has(profile.id)
+      ? profile.calendars
+          .filter(
+            (calendar) =>
+              calendar.id.startsWith("calendar-") &&
+              !remoteFeeds.has(`${profile.id}\u0000${calendar.url}`),
+          )
+          .map((calendar) => ({
+            household_id: householdId,
+            profile_id: profile.id,
+            name: calendar.name,
+            feed_url: calendar.url,
+            enabled: calendar.enabled,
+          }))
+      : [],
+  );
+
+  const request = (async () => {
+    if (!supabase || pendingCalendars.length === 0) return remoteCalendars;
+
+    const { data, error } = await supabase
+      .from("calendar_sources")
+      .insert(pendingCalendars)
+      .select("*");
+
+    if (error) throw error;
+    return [...remoteCalendars, ...(data ?? [])];
+  })();
+
+  calendarRecoveryRequests.set(householdId, request);
+  return request;
+}
 
 function supportedLanguage(value: string): AppLanguage {
   return value === "en" ? "en" : "nl";
@@ -145,23 +241,24 @@ async function loadHousehold(session: Session | null) {
 
   const household = householdResult.data;
   const profiles = profilesResult.data ?? [];
-  const calendars = calendarsResult.data ?? [];
+  let calendars = calendarsResult.data ?? [];
+
+  if (membership.role === "owner" || membership.role === "admin") {
+    try {
+      calendars = await recoverLocalCalendars(
+        household.id,
+        profiles,
+        calendars,
+      );
+    } catch (error) {
+      console.warn("Unable to recover locally stored calendars", error);
+    }
+  }
+
+  if (currentLoadId !== loadId) return;
+
   const nextSettings: AppSettings = {
-    profiles: profiles.map((profile) => ({
-      id: profile.id,
-      name: profile.name,
-      avatar: profile.avatar,
-      color: profile.color,
-      family: profile.is_family,
-      calendars: calendars
-        .filter((calendar) => calendar.profile_id === profile.id)
-        .map((calendar) => ({
-          id: calendar.id,
-          name: calendar.name,
-          url: calendar.feed_url,
-          enabled: calendar.enabled,
-        })),
-    })),
+    profiles: profiles.map((profile) => householdProfile(profile, calendars)),
     location: {
       name: household.location_name,
       latitude: household.latitude,
@@ -289,4 +386,212 @@ export async function completeHouseholdOnboarding({
 
 export function currentLocalSettings() {
   return structuredClone(get(appSettings));
+}
+
+export async function createCalendarSource(
+  profileId: string,
+  input: Pick<CalendarFeed, "name" | "url" | "enabled">,
+) {
+  if (!supabase) throw new Error("Supabase is not configured");
+  const { household } = readyHousehold();
+  const { data, error } = await supabase
+    .from("calendar_sources")
+    .insert({
+      household_id: household.id,
+      profile_id: profileId,
+      name: input.name,
+      feed_url: input.url,
+      enabled: input.enabled,
+    })
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  const calendar = calendarFeed(data);
+  appSettings.update((settings) => ({
+    ...settings,
+    profiles: settings.profiles.map((profile) =>
+      profile.id === profileId
+        ? { ...profile, calendars: [...profile.calendars, calendar] }
+        : profile,
+    ),
+  }));
+  return calendar;
+}
+
+export async function updateCalendarSource(
+  profileId: string,
+  calendarId: string,
+  patch: Partial<Pick<CalendarFeed, "name" | "url" | "enabled">>,
+) {
+  if (!supabase) throw new Error("Supabase is not configured");
+  const { household } = readyHousehold();
+  const databasePatch = {
+    ...(patch.name === undefined ? {} : { name: patch.name }),
+    ...(patch.url === undefined ? {} : { feed_url: patch.url }),
+    ...(patch.enabled === undefined ? {} : { enabled: patch.enabled }),
+  };
+  const { data, error } = await supabase
+    .from("calendar_sources")
+    .update(databasePatch)
+    .eq("id", calendarId)
+    .eq("household_id", household.id)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  const calendar = calendarFeed(data);
+  appSettings.update((settings) => ({
+    ...settings,
+    profiles: settings.profiles.map((profile) =>
+      profile.id === profileId
+        ? {
+            ...profile,
+            calendars: profile.calendars.map((item) =>
+              item.id === calendarId ? calendar : item,
+            ),
+          }
+        : profile,
+    ),
+  }));
+}
+
+export async function deleteCalendarSource(
+  profileId: string,
+  calendarId: string,
+) {
+  if (!supabase) throw new Error("Supabase is not configured");
+  const { household } = readyHousehold();
+  const { error } = await supabase
+    .from("calendar_sources")
+    .delete()
+    .eq("id", calendarId)
+    .eq("household_id", household.id);
+
+  if (error) throw error;
+  appSettings.update((settings) => ({
+    ...settings,
+    profiles: settings.profiles.map((profile) =>
+      profile.id === profileId
+        ? {
+            ...profile,
+            calendars: profile.calendars.filter(
+              (calendar) => calendar.id !== calendarId,
+            ),
+          }
+        : profile,
+    ),
+  }));
+}
+
+export async function createProfile(
+  input: Pick<HouseholdProfile, "name" | "avatar" | "color">,
+) {
+  if (!supabase) throw new Error("Supabase is not configured");
+  const { household } = readyHousehold();
+  const sortOrder = get(appSettings).profiles.length;
+  const { data, error } = await supabase
+    .from("profiles")
+    .insert({
+      household_id: household.id,
+      name: input.name,
+      avatar: input.avatar,
+      color: input.color,
+      is_family: false,
+      sort_order: sortOrder,
+    })
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  const profile = householdProfile(data, []);
+  appSettings.update((settings) => ({
+    ...settings,
+    profiles: [...settings.profiles, profile],
+  }));
+  return profile;
+}
+
+export async function updateProfile(
+  profileId: string,
+  patch: Partial<Pick<HouseholdProfile, "name" | "avatar" | "color">>,
+) {
+  if (!supabase) throw new Error("Supabase is not configured");
+  const { household } = readyHousehold();
+  const { data, error } = await supabase
+    .from("profiles")
+    .update(patch)
+    .eq("id", profileId)
+    .eq("household_id", household.id)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  appSettings.update((settings) => ({
+    ...settings,
+    profiles: settings.profiles.map((profile) =>
+      profile.id === profileId
+        ? {
+            ...profile,
+            name: data.name,
+            avatar: data.avatar,
+            color: data.color,
+          }
+        : profile,
+    ),
+  }));
+}
+
+export async function deleteProfile(profileId: string) {
+  if (!supabase) throw new Error("Supabase is not configured");
+  const { household } = readyHousehold();
+  const { error } = await supabase
+    .from("profiles")
+    .delete()
+    .eq("id", profileId)
+    .eq("household_id", household.id)
+    .eq("is_family", false);
+
+  if (error) throw error;
+  appSettings.update((settings) => ({
+    ...settings,
+    profiles: settings.profiles.filter((profile) => profile.id !== profileId),
+  }));
+}
+
+export async function updateHouseholdSettings(
+  patch: Partial<{
+    language: AppLanguage;
+    colorMode: ColorModePreference;
+    location: DashboardLocation;
+  }>,
+) {
+  if (!supabase) throw new Error("Supabase is not configured");
+  const { household } = readyHousehold();
+  const databasePatch = {
+    ...(patch.language === undefined ? {} : { language: patch.language }),
+    ...(patch.colorMode === undefined
+      ? {}
+      : { color_mode: patch.colorMode }),
+    ...(patch.location === undefined
+      ? {}
+      : {
+          location_name: patch.location.name,
+          latitude: patch.location.latitude,
+          longitude: patch.location.longitude,
+          timezone: patch.location.timezone,
+        }),
+  };
+  const { error } = await supabase
+    .from("households")
+    .update(databasePatch)
+    .eq("id", household.id);
+
+  if (error) throw error;
+  appSettings.update((settings) => ({
+    ...settings,
+    ...(patch.language === undefined ? {} : { language: patch.language }),
+    ...(patch.colorMode === undefined ? {} : { colorMode: patch.colorMode }),
+    ...(patch.location === undefined ? {} : { location: patch.location }),
+  }));
 }
