@@ -19,6 +19,7 @@
   import SettingsView from "#lib/components/settings-view.svelte";
   import TasksView from "#lib/components/tasks-view.svelte";
   import { appLocale, translations } from "#lib/i18n.js";
+  import { householdSession } from "#lib/household-session.js";
   import * as Avatar from "#lib/components/ui/avatar/index.js";
   import { Button } from "#lib/components/ui/button/index.js";
   import * as ScrollArea from "#lib/components/ui/scroll-area/index.js";
@@ -31,6 +32,10 @@
   let weather = $derived($weatherStore.current);
   let weatherUnavailable = $derived($weatherStore.unavailable);
   let text = $derived(translations[$appSettings.language]);
+  let householdName = $derived(
+    $householdSession.household?.name ??
+      ($appSettings.language === "nl" ? "Familie Hellemons" : "Hellemons Family"),
+  );
   let formattedDate = $derived(
     new Intl.DateTimeFormat(appLocale($appSettings.language), {
       weekday: "long",
@@ -52,7 +57,10 @@
     if (
       !$appSettings.profiles.some((profile) => profile.id === $activeProfileId)
     ) {
-      activeProfileId.set("family");
+      const familyProfile =
+        $appSettings.profiles.find((profile) => profile.family) ??
+        $appSettings.profiles[0];
+      if (familyProfile) activeProfileId.set(familyProfile.id);
     }
   });
 
@@ -96,7 +104,7 @@
         >
           {formattedDate} · {formattedTime}
         </time>
-        <h1 class="text-3xl font-semibold tracking-tight">Familie Hellemons</h1>
+        <h1 class="text-3xl font-semibold tracking-tight">{householdName}</h1>
       </div>
 
       <div class="flex items-center gap-6">

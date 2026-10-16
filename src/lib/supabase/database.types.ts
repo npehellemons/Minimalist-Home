@@ -175,6 +175,19 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      complete_household_onboarding: {
+        Args: {
+          household_color_mode: string;
+          household_language: string;
+          household_latitude: number;
+          household_location: string;
+          household_longitude: number;
+          household_name: string;
+          household_profiles: Json;
+          household_timezone: string;
+        };
+        Returns: string;
+      };
       create_household: {
         Args: {
           family_name?: string;

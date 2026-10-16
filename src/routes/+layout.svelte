@@ -9,8 +9,7 @@
 
 <div class="grid h-screen h-dvh w-screen place-items-center overflow-hidden bg-background">
   <div
-    class="relative overflow-hidden bg-background"
-    style="width: min(1280px, 100vw, 160dvh); height: min(800px, 100dvh, 62.5vw);"
+    class="device-shell relative overflow-hidden bg-background"
     data-device-width="1280"
     data-device-height="800"
   >

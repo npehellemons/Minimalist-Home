@@ -8,7 +8,12 @@
     Settings,
   } from "@lucide/svelte";
   import { appSettings } from "#lib/app-settings.js";
+  import OnboardingView from "#lib/components/onboarding-view.svelte";
   import Screensaver from "#lib/components/screensaver.svelte";
+  import {
+    householdSession,
+    startHouseholdSession,
+  } from "#lib/household-session.js";
   import { translations } from "#lib/i18n.js";
   import { provideWeatherStore } from "#lib/weather-store.js";
   import { Button } from "#lib/components/ui/button/index.js";
@@ -16,7 +21,7 @@
   import * as Tabs from "#lib/components/ui/tabs/index.js";
   import * as Tooltip from "#lib/components/ui/tooltip/index.js";
   import { setMode } from "mode-watcher";
-  import { untrack } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { fade } from "svelte/transition";
 
   let { children } = $props();
@@ -24,6 +29,8 @@
   let screensaverActive = $state(false);
   let text = $derived(translations[$appSettings.language]);
   provideWeatherStore();
+
+  onMount(() => startHouseholdSession());
 
   $effect(() => {
     const preferredMode = $appSettings.colorMode;
@@ -46,7 +53,9 @@
 </script>
 
 <div class="relative h-full w-full overflow-hidden">
-  {#if screensaverActive}
+  {#if $householdSession.status !== "ready" && $householdSession.status !== "unconfigured"}
+    <OnboardingView />
+  {:else if screensaverActive}
     <div class="absolute inset-0" transition:fade={{ duration: 250 }}>
       <Screensaver onExit={exitScreensaver} />
     </div>

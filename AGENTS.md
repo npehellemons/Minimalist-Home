@@ -36,7 +36,10 @@ The interface should be designed primarily for the device's 1280 × 800 landscap
 
 - Generate a static site with `pnpm build`; deploy the contents of `build/`.
 - Keep the interface optimized for the fixed 1280 × 800 touchscreen.
-- Use shadcn-svelte components for application UI where an appropriate component exists.
+- Use shadcn-svelte as the default UI system for both the photo-frame interface and all responsive mobile companion views.
+- Use an existing shadcn-svelte component whenever one can reasonably provide the required structure, control, state, feedback, or interaction. Compose and configure shadcn-svelte components before creating custom UI primitives.
+- Add custom component implementations only when shadcn-svelte does not provide a suitable component. Keep any necessary custom styling limited to layout, responsive behavior, and domain-specific presentation that the component library cannot express.
+- Preserve shadcn-svelte behavior, accessibility, design tokens, and interaction conventions when extending components. Do not recreate controls such as buttons, inputs, dialogs, menus, tabs, cards, forms, drawers, tooltips, scroll areas, or feedback states from scratch.
 - Keep browser-only integrations free of native Android or Capacitor APIs.
 - Local development and static preview may use Vite middleware.
 - Production features that require secrets, CORS bypassing, or server-side requests must use a separately hosted same-origin or CORS-enabled endpoint.

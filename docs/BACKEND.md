@@ -11,8 +11,9 @@ in this repository.
 - Every household has one protected family profile plus personal profiles.
 - Calendar sources belong to a profile, so calendar events inherit that profile's color.
 - Row-level security prevents signed-out users and other households from reading data.
-- The existing browser-local settings remain the active data source until onboarding and
-  synchronization are added.
+- First-run onboarding works on both the photo frame and responsive phone layouts.
+- Household creation imports existing browser-local profiles and calendars in one database transaction.
+- The dashboard hydrates its local settings from Supabase after sign-in.
 
 ## Commands
 
@@ -22,13 +23,20 @@ pnpm db:reset
 pnpm db:lint
 pnpm db:types
 pnpm db:stop
+pnpm test:onboarding
 ```
 
 For remote schema work, pull development variables with
 `pnpm dlx vercel@latest env pull .env.local`. Never commit `.env.local`.
 
+## Authentication URLs
+
+Hosted Supabase Auth must use `https://minimalist-home.vercel.app` as its Site URL.
+Allow `http://localhost:5173/**`, `http://127.0.0.1:5173/**`, and the Vercel preview
+pattern in its redirect allow-list. The matching local values live in `supabase/config.toml`.
+
 ## Next slice
 
-Add email authentication and household onboarding, then migrate local settings once
-after the owner signs in. A later device-pairing flow should give the photo frame a
-revocable device credential rather than storing the owner's password on the frame.
+Persist settings edits back to Supabase and add household invitations. A later
+device-pairing flow should give the photo frame a revocable device credential rather
+than storing the owner's password on the frame.

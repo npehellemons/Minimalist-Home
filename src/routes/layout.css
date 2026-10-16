@@ -198,3 +198,15 @@
 		@apply font-sans;
 	}
 }
+
+.device-shell {
+	width: 100vw;
+	height: 100dvh;
+}
+
+@media (min-width: 768px) and (orientation: landscape) {
+	.device-shell {
+		width: min(1280px, 100vw, 160dvh);
+		height: min(800px, 100dvh, 62.5vw);
+	}
+}

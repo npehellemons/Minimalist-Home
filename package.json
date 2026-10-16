@@ -16,7 +16,8 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:lint": "supabase db lint --level warning",
-    "db:types": "supabase gen types typescript --schema public --local > src/lib/supabase/database.types.ts"
+    "db:types": "supabase gen types typescript --schema public --local > src/lib/supabase/database.types.ts",
+    "test:onboarding": "node scripts/test-household-onboarding.mjs"
   },
   "dependencies": {
     "@fullcalendar/icalendar": "^7.1.2",
