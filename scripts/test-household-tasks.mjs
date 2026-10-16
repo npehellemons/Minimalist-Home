@@ -102,7 +102,7 @@ try {
     task_kind: "routine",
     task_profile_ids: [family.id, person.id],
     task_day_part: "morning",
-    task_weekdays: [0, 1, 2, 3, 4, 5, 6],
+    task_weekdays: [1, 3, 5],
     task_emoji: "🪥",
   });
   if (taskError) throw taskError;
@@ -110,11 +110,14 @@ try {
 
   const { data: memberTasks, error: memberTasksError } = await member
     .from("tasks")
-    .select("id, title, kind, day_part")
+    .select("id, title, kind, day_part, weekdays")
     .eq("household_id", householdId);
   if (memberTasksError) throw memberTasksError;
   if (memberTasks.length !== 1 || memberTasks[0].id !== taskId) {
     throw new Error("Member could not read the household task");
+  }
+  if (memberTasks[0].weekdays.join(",") !== "1,3,5") {
+    throw new Error("Selected routine weekdays were not stored correctly");
   }
 
   const { data: assignments, error: assignmentsError } = await member

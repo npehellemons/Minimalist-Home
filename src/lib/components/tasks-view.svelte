@@ -38,6 +38,19 @@
     range: string;
   };
 
+  type RoutineFrequency = "daily" | "selected-days";
+
+  const weekdays = [
+    { id: "monday", value: 1 },
+    { id: "tuesday", value: 2 },
+    { id: "wednesday", value: 3 },
+    { id: "thursday", value: 4 },
+    { id: "friday", value: 5 },
+    { id: "saturday", value: 6 },
+    { id: "sunday", value: 0 },
+  ] as const;
+  const everyDay = weekdays.map((day) => day.value);
+
   const dayBlocks: DayBlock[] = [
     { id: "morning", range: "00:00 - 12:00" },
     { id: "afternoon", range: "12:00 - 18:00" },
@@ -91,6 +104,8 @@
   let taskEmoji = $state("");
   let taskKind = $state<TaskKind>("routine");
   let taskDayPart = $state<TaskDayPart>(initialBlock);
+  let routineFrequency = $state<RoutineFrequency>("daily");
+  let taskWeekdays = $state<number[]>([...everyDay]);
   let taskDueDate = $state(
     dateKeyInTimeZone(initialNow, initialSettings.location.timezone),
   );
@@ -122,6 +137,11 @@
       : visibleProfiles.length === 2
         ? "calc((100% - 1rem) / 2)"
         : "calc((100% - 2rem) / 3)",
+  );
+  let routineScheduleIsValid = $derived(
+    taskKind !== "routine" ||
+      routineFrequency === "daily" ||
+      taskWeekdays.length > 0,
   );
 
   function tasksForProfile(profile: HouseholdProfile) {
@@ -159,6 +179,8 @@
     taskEmoji = "";
     taskKind = "routine";
     taskDayPart = selectedBlockId;
+    routineFrequency = "daily";
+    taskWeekdays = [...everyDay];
     taskDueDate = todayKey;
     taskDueTime = "";
     selectedProfileIds = defaultProfile ? [defaultProfile.id] : [];
@@ -172,10 +194,21 @@
       : selectedProfileIds.filter((id) => id !== profileId);
   }
 
+  function toggleWeekday(weekday: number) {
+    taskWeekdays = taskWeekdays.includes(weekday)
+      ? taskWeekdays.filter((day) => day !== weekday)
+      : [...taskWeekdays, weekday];
+  }
+
   async function submitTask(event: SubmitEvent) {
     event.preventDefault();
     const session = get(householdSession);
-    if (!session.household || !taskTitle.trim() || selectedProfileIds.length === 0) {
+    if (
+      !session.household ||
+      !taskTitle.trim() ||
+      selectedProfileIds.length === 0 ||
+      !routineScheduleIsValid
+    ) {
       return;
     }
 
@@ -190,6 +223,8 @@
         kind: taskKind,
         profileIds: selectedProfileIds,
         dayPart: taskDayPart,
+        weekdays:
+          routineFrequency === "daily" ? [...everyDay] : taskWeekdays,
         dueDate: taskDueDate,
         dueTime: taskDueTime,
       });
@@ -510,7 +545,50 @@
                   {/each}
                 </Tabs.List>
               </Tabs.Root>
-              <p class="text-xs text-muted-foreground">{text.tasks.dailyRoutine}</p>
+            </div>
+
+            <div class="grid gap-2">
+              <Label>{text.tasks.repeats}</Label>
+              <Tabs.Root bind:value={routineFrequency}>
+                <Tabs.List class="grid w-full grid-cols-2">
+                  <Tabs.Trigger value="daily">{text.tasks.everyDay}</Tabs.Trigger>
+                  <Tabs.Trigger value="selected-days">
+                    {text.tasks.selectedDays}
+                  </Tabs.Trigger>
+                </Tabs.List>
+              </Tabs.Root>
+
+              {#if routineFrequency === "selected-days"}
+                <div
+                  class="grid grid-cols-7 gap-1"
+                  role="group"
+                  aria-label={text.tasks.weekdays}
+                >
+                  {#each weekdays as weekday}
+                    <Button
+                      variant={taskWeekdays.includes(weekday.value)
+                        ? "default"
+                        : "outline"}
+                      size="icon"
+                      class="h-auto w-full aspect-square min-w-0 text-xs"
+                      aria-label={text.tasks.days[weekday.id]}
+                      aria-pressed={taskWeekdays.includes(weekday.value)}
+                      onclick={() => toggleWeekday(weekday.value)}
+                    >
+                      {text.tasks.daysShort[weekday.id]}
+                    </Button>
+                  {/each}
+                </div>
+                {#if taskWeekdays.length === 0}
+                  <p class="text-sm text-destructive">{text.tasks.weekdayRequired}</p>
+                {/if}
+              {/if}
+
+              <p class="text-xs text-muted-foreground">
+                {routineFrequency === "daily"
+                  ? text.tasks.dailyRoutine
+                  : text.tasks.weeklyRoutine}
+              </p>
             </div>
           {:else}
             <div class="grid grid-cols-2 gap-3">
@@ -538,7 +616,10 @@
         <Button
           type="submit"
           size="lg"
-          disabled={creating || !taskTitle.trim() || selectedProfileIds.length === 0}
+          disabled={creating ||
+            !taskTitle.trim() ||
+            selectedProfileIds.length === 0 ||
+            !routineScheduleIsValid}
         >
           {creating ? text.tasks.creating : text.tasks.create}
         </Button>

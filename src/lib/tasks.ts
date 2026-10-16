@@ -28,6 +28,7 @@ export type CreateTaskInput = {
   kind: TaskKind;
   profileIds: string[];
   dayPart?: TaskDayPart;
+  weekdays?: number[];
   dueDate?: string;
   dueTime?: string;
   emoji?: string;
@@ -136,8 +137,7 @@ export async function createTask(input: CreateTaskInput) {
     task_due_date: input.kind === "chore" ? input.dueDate : null,
     task_due_time:
       input.kind === "chore" && input.dueTime ? input.dueTime : null,
-    task_weekdays:
-      input.kind === "routine" ? [0, 1, 2, 3, 4, 5, 6] : null,
+    task_weekdays: input.kind === "routine" ? input.weekdays : null,
     task_emoji: input.emoji?.trim() || null,
     task_description: input.description?.trim() || null,
   });

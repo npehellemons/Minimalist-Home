@@ -40,6 +40,7 @@ Implemented:
 - Show routines for the selected morning, afternoon, or evening block.
 - Keep chores due today visible in every day-part view.
 - Create a daily routine or one-time chore from a Shadcn Sheet.
+- Repeat routines every day or on selected weekdays.
 - Assign a task to one or more profiles.
 - Add an optional emoji for quick visual recognition.
 - Check and uncheck tasks with optimistic feedback.
@@ -50,7 +51,6 @@ Implemented:
 
 Current deliberate limits:
 
-- Routines repeat every day.
 - The board shows today only.
 - Tasks cannot yet be edited, deleted, skipped, or reordered in the interface.
 - Chores are one-time and are shown only on their due date.
@@ -74,7 +74,6 @@ Acceptance criteria:
 
 ## Phase 3: Recurrence And Skip
 
-- Choose weekdays for routines.
 - Let one routine appear in multiple day-parts without duplicating its definition.
 - Add daily, weekly, monthly, and custom recurrence for chores.
 - Add optional recurrence end dates.
