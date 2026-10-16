@@ -431,7 +431,7 @@
 </div>
 
 <Sheet.Root bind:open={createOpen}>
-  <Sheet.Content class="w-full sm:max-w-md">
+  <Sheet.Content class="w-screen max-w-none sm:w-3/4 sm:max-w-md">
     <Sheet.Header>
       <Sheet.Title>{text.tasks.add}</Sheet.Title>
       <Sheet.Description>{text.tasks.addDescription}</Sheet.Description>

@@ -21,6 +21,12 @@ A task may be assigned to one or more profiles. Each assignment gets an
 independent completion state so two people can complete the same task separately.
 The Family profile represents a genuinely shared task, not an unassigned task.
 
+Task type and recurrence are separate concepts. A routine describes a habit tied
+to a day-part and may repeat daily or on selected weekdays. A chore describes a
+responsibility and may be one-time or repeat daily, weekly, monthly, or on a
+custom schedule. A weekly habit can therefore remain a routine; a monthly item
+with a due date is normally clearer as a repeating chore.
+
 Rewards and stars are intentionally outside the planned scope for now.
 
 ## Phase 1: Daily Checklist
