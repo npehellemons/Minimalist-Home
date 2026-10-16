@@ -121,7 +121,7 @@
   }
 
   async function setColorMode(colorMode: ColorModePreference) {
-    await persist(() => updateHouseholdSettings({ colorMode }));
+    appSettings.update((settings) => ({ ...settings, colorMode }));
   }
 
   async function saveLocation(event: SubmitEvent) {

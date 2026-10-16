@@ -7,7 +7,6 @@ import {
   type AppLanguage,
   type AppSettings,
   type CalendarFeed,
-  type ColorModePreference,
   type DashboardLocation,
   type HouseholdProfile,
 } from "#lib/app-settings.js";
@@ -142,10 +141,6 @@ function supportedLanguage(value: string): AppLanguage {
   return value === "en" ? "en" : "nl";
 }
 
-function supportedColorMode(value: string): ColorModePreference {
-  return value === "light" || value === "dark" ? value : "auto";
-}
-
 async function loadHousehold(session: Session | null) {
   const currentLoadId = ++loadId;
 
@@ -257,6 +252,7 @@ async function loadHousehold(session: Session | null) {
 
   if (currentLoadId !== loadId) return;
 
+  const deviceColorMode = get(appSettings).colorMode;
   const nextSettings: AppSettings = {
     profiles: profiles.map((profile) => householdProfile(profile, calendars)),
     location: {
@@ -266,7 +262,7 @@ async function loadHousehold(session: Session | null) {
       timezone: household.timezone,
     },
     language: supportedLanguage(household.language),
-    colorMode: supportedColorMode(household.color_mode),
+    colorMode: deviceColorMode,
   };
 
   appSettings.set(nextSettings);
@@ -372,7 +368,7 @@ export async function completeHouseholdOnboarding({
   const { error } = await supabase.rpc("complete_household_onboarding", {
     household_name: name,
     household_language: settings.language,
-    household_color_mode: settings.colorMode,
+    household_color_mode: "auto",
     household_location: settings.location.name,
     household_latitude: settings.location.latitude,
     household_longitude: settings.location.longitude,
@@ -562,7 +558,6 @@ export async function deleteProfile(profileId: string) {
 export async function updateHouseholdSettings(
   patch: Partial<{
     language: AppLanguage;
-    colorMode: ColorModePreference;
     location: DashboardLocation;
   }>,
 ) {
@@ -570,9 +565,6 @@ export async function updateHouseholdSettings(
   const { household } = readyHousehold();
   const databasePatch = {
     ...(patch.language === undefined ? {} : { language: patch.language }),
-    ...(patch.colorMode === undefined
-      ? {}
-      : { color_mode: patch.colorMode }),
     ...(patch.location === undefined
       ? {}
       : {
@@ -591,7 +583,6 @@ export async function updateHouseholdSettings(
   appSettings.update((settings) => ({
     ...settings,
     ...(patch.language === undefined ? {} : { language: patch.language }),
-    ...(patch.colorMode === undefined ? {} : { colorMode: patch.colorMode }),
     ...(patch.location === undefined ? {} : { location: patch.location }),
   }));
 }
