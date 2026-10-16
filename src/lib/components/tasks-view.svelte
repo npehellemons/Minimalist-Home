@@ -338,7 +338,7 @@
             class="flex min-h-16 shrink-0 flex-row items-center justify-between border-b px-4 pt-(--card-spacing)"
           >
             <div class="flex min-w-0 items-center gap-3">
-              <ProfileAvatar name={profile.name} />
+              <ProfileAvatar name={profile.name} color={profile.color} />
               <Card.Title class="truncate">{profile.name}</Card.Title>
             </div>
             <Badge

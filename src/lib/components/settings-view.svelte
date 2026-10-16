@@ -198,7 +198,12 @@
           {/if}
           <section class="grid gap-5 px-4 py-5 sm:px-6">
             <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto] sm:items-end">
-              <ProfileAvatar name={profile.name} size="lg" class="col-start-1 row-start-1 self-center" />
+              <ProfileAvatar
+                name={profile.name}
+                color={profile.color}
+                size="lg"
+                class="col-start-1 row-start-1 self-center"
+              />
               <p class="col-start-2 row-start-1 truncate font-medium sm:hidden">{profile.name}</p>
               <div class="col-span-3 row-start-2 grid min-w-0 gap-2 sm:col-span-1 sm:col-start-2 sm:row-start-1">
                 <Label for={`${profile.id}-name`}>{text.settings.profileName}</Label>
@@ -281,25 +286,27 @@
                         })}
                     />
                   </div>
-                  <div class="grid justify-items-center gap-2">
-                    <Label class="sr-only" for={`${profile.id}-${calendar.id}-enabled`}>
-                      {text.settings.enabled}
-                    </Label>
-                    <Switch
-                      id={`${profile.id}-${calendar.id}-enabled`}
-                      checked={calendar.enabled}
-                      onCheckedChange={(enabled) =>
-                        updateCalendar(profile.id, calendar.id, { enabled })}
-                    />
+                  <div class="col-span-2 flex items-center justify-end gap-2 sm:contents">
+                    <div class="flex size-9 items-center justify-center">
+                      <Label class="sr-only" for={`${profile.id}-${calendar.id}-enabled`}>
+                        {text.settings.enabled}
+                      </Label>
+                      <Switch
+                        id={`${profile.id}-${calendar.id}-enabled`}
+                        checked={calendar.enabled}
+                        onCheckedChange={(enabled) =>
+                          updateCalendar(profile.id, calendar.id, { enabled })}
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={text.settings.removeCalendar}
+                      onclick={() => removeCalendar(profile.id, calendar.id)}
+                    >
+                      <Trash2 aria-hidden="true" />
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={text.settings.removeCalendar}
-                    onclick={() => removeCalendar(profile.id, calendar.id)}
-                  >
-                    <Trash2 aria-hidden="true" />
-                  </Button>
                 </div>
               {/each}
 
@@ -347,7 +354,12 @@
           class="grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-3 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto] sm:items-end"
           onsubmit={addProfile}
         >
-          <ProfileAvatar name={profileName || text.settings.addProfile} size="lg" class="col-start-1 row-start-1 self-center" />
+          <ProfileAvatar
+            name={profileName || text.settings.addProfile}
+            color={profileColor}
+            size="lg"
+            class="col-start-1 row-start-1 self-center"
+          />
           <p class="col-start-2 row-start-1 font-medium sm:hidden">{text.settings.addProfile}</p>
           <div class="col-span-2 row-start-2 grid gap-2 sm:col-span-1 sm:col-start-2 sm:row-start-1">
             <Label for="new-profile-name">{text.settings.profileName}</Label>

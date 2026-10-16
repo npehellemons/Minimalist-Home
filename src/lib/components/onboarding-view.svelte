@@ -369,7 +369,11 @@
                 <Card.Content class="gap-3">
                   <div class="flex flex-wrap items-center gap-2">
                     {#each sourceSettings.profiles as profile (profile.id)}
-                      <ProfileAvatar name={profile.name} size="sm" />
+                      <ProfileAvatar
+                        name={profile.name}
+                        color={profile.color}
+                        size="sm"
+                      />
                     {/each}
                     <Badge variant="outline"
                       >{profileCount} {text.profiles}</Badge

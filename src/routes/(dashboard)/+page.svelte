@@ -125,6 +125,7 @@
               >
                 <ProfileAvatar
                   name={profile.name}
+                  color={profile.color}
                   active={$activeProfileId === profile.id}
                 />
               </Button>
