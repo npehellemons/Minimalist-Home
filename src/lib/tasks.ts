@@ -216,6 +216,20 @@ export async function setTaskCompleted(
   if (error) throw error;
 }
 
+export async function deleteTask(householdId: string, taskId: string) {
+  const client = requireSupabase();
+  const { data, error } = await client
+    .from("tasks")
+    .delete()
+    .eq("household_id", householdId)
+    .eq("id", taskId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) throw new Error("Task was not found or could not be removed");
+}
+
 export function subscribeToTasks(householdId: string, onChange: () => void) {
   const client = requireSupabase();
   const channel: RealtimeChannel = client.channel(`household-tasks:${householdId}`);

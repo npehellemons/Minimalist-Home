@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ListChecks, Plus, Repeat2 } from "@lucide/svelte";
+  import { EllipsisVertical, ListChecks, Plus, Repeat2 } from "@lucide/svelte";
   import { onMount } from "svelte";
   import { get } from "svelte/store";
 
@@ -10,10 +10,12 @@
   } from "#lib/app-settings.js";
   import ProfileAvatar from "#lib/components/profile-avatar.svelte";
   import * as Alert from "#lib/components/ui/alert/index.js";
+  import * as AlertDialog from "#lib/components/ui/alert-dialog/index.js";
   import { Badge } from "#lib/components/ui/badge/index.js";
   import { Button } from "#lib/components/ui/button/index.js";
   import * as Card from "#lib/components/ui/card/index.js";
   import { Checkbox } from "#lib/components/ui/checkbox/index.js";
+  import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
   import { Input } from "#lib/components/ui/input/index.js";
   import { Label } from "#lib/components/ui/label/index.js";
   import * as ScrollArea from "#lib/components/ui/scroll-area/index.js";
@@ -25,6 +27,7 @@
   import {
     createTask,
     dateKeyInTimeZone,
+    deleteTask,
     getDailyTasks,
     setTaskCompleted,
     subscribeToTasks,
@@ -113,6 +116,10 @@
   let taskDueTime = $state("");
   let choreRecurrence = $state<ChoreRecurrence>("none");
   let selectedProfileIds = $state<string[]>([]);
+  let deleteOpen = $state(false);
+  let deleting = $state(false);
+  let deleteError = $state("");
+  let taskToDelete = $state<DailyTask | null>(null);
 
   let text = $derived(translations[$appSettings.language]);
   let activeBlockId = $derived(
@@ -264,6 +271,34 @@
       loadError = text.tasks.completeError;
     } finally {
       pendingCompletions = pendingCompletions.filter((key) => key !== pendingKey);
+    }
+  }
+
+  function openDeleteTask(task: DailyTask) {
+    taskToDelete = task;
+    deleteError = "";
+    deleteOpen = true;
+  }
+
+  async function confirmDeleteTask(event: MouseEvent) {
+    event.preventDefault();
+    const session = get(householdSession);
+    if (!session.household || !taskToDelete) return;
+
+    deleting = true;
+    deleteError = "";
+
+    try {
+      const taskId = taskToDelete.id;
+      await deleteTask(session.household.id, taskId);
+      tasks = tasks.filter((task) => task.id !== taskId);
+      deleteOpen = false;
+      taskToDelete = null;
+    } catch (error) {
+      console.error("Unable to remove household task", error);
+      deleteError = text.tasks.removeErrorDescription;
+    } finally {
+      deleting = false;
     }
   }
 
@@ -429,42 +464,67 @@
                 {:else}
                   {#each sortedTasks(profileTasks) as task (`${task.id}-${task.profileId}`)}
                     {@const pendingKey = `${task.id}\u0000${task.profileId}`}
-                    <label
-                      class="flex min-h-16 cursor-pointer items-center gap-3 px-4 py-3 text-sm"
+                    <div
+                      class="flex min-h-16 items-center gap-1 px-2 text-sm"
                       class:text-muted-foreground={task.completed}
                     >
-                      <Checkbox
-                        class="size-6"
-                        checked={task.completed}
-                        disabled={pendingCompletions.includes(pendingKey)}
-                        aria-label={task.title}
-                        onCheckedChange={(checked) =>
-                          void toggleTask(task, checked === true)}
-                      />
-                      {#if task.emoji}
-                        <span class="text-xl" aria-hidden="true">{task.emoji}</span>
-                      {/if}
-                      <span class="min-w-0 flex-1">
-                        <span class="block font-medium" class:line-through={task.completed}>
-                          {task.title}
-                        </span>
-                        <span class="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                          {#if task.kind === "routine"}
-                            <Repeat2 class="size-3" aria-hidden="true" />
-                            {text.tasks.routine}
-                          {:else}
-                            <ListChecks class="size-3" aria-hidden="true" />
-                            {text.tasks.chore}
-                            {#if task.dueTime}
-                              · {task.dueTime.slice(0, 5)}
+                      <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-2 py-3">
+                        <Checkbox
+                          class="size-6"
+                          checked={task.completed}
+                          disabled={pendingCompletions.includes(pendingKey)}
+                          aria-label={task.title}
+                          onCheckedChange={(checked) =>
+                            void toggleTask(task, checked === true)}
+                        />
+                        {#if task.emoji}
+                          <span class="text-xl" aria-hidden="true">{task.emoji}</span>
+                        {/if}
+                        <span class="min-w-0 flex-1">
+                          <span class="block font-medium" class:line-through={task.completed}>
+                            {task.title}
+                          </span>
+                          <span class="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                            {#if task.kind === "routine"}
+                              <Repeat2 class="size-3" aria-hidden="true" />
+                              {text.tasks.routine}
+                            {:else}
+                              <ListChecks class="size-3" aria-hidden="true" />
+                              {text.tasks.chore}
+                              {#if task.dueTime}
+                                · {task.dueTime.slice(0, 5)}
+                              {/if}
+                              {#if task.recurrence !== "none"}
+                                · {text.tasks[task.recurrence]}
+                              {/if}
                             {/if}
-                            {#if task.recurrence !== "none"}
-                              · {text.tasks[task.recurrence]}
-                            {/if}
-                          {/if}
+                          </span>
                         </span>
-                      </span>
-                    </label>
+                      </label>
+                      <DropdownMenu.Root>
+                        <DropdownMenu.Trigger>
+                          {#snippet child({ props })}
+                            <Button
+                              {...props}
+                              variant="ghost"
+                              size="icon-sm"
+                              class="shrink-0 text-muted-foreground"
+                              aria-label={`${text.tasks.moreActions}: ${task.title}`}
+                            >
+                              <EllipsisVertical aria-hidden="true" />
+                            </Button>
+                          {/snippet}
+                        </DropdownMenu.Trigger>
+                        <DropdownMenu.Content align="end">
+                          <DropdownMenu.Item
+                            variant="destructive"
+                            onSelect={() => openDeleteTask(task)}
+                          >
+                            {text.tasks.remove}
+                          </DropdownMenu.Item>
+                        </DropdownMenu.Content>
+                      </DropdownMenu.Root>
+                    </div>
                   {/each}
                 {/if}
               </Card.Content>
@@ -672,6 +732,35 @@
     </form>
   </Sheet.Content>
 </Sheet.Root>
+
+<AlertDialog.Root bind:open={deleteOpen}>
+  <AlertDialog.Content>
+    <AlertDialog.Header>
+      <AlertDialog.Title>{text.tasks.removeTitle}</AlertDialog.Title>
+      <AlertDialog.Description>
+        {text.tasks.removeDescription.replace("{title}", taskToDelete?.title ?? "")}
+      </AlertDialog.Description>
+    </AlertDialog.Header>
+
+    {#if deleteError}
+      <Alert.Root variant="destructive">
+        <Alert.Title>{text.tasks.removeError}</Alert.Title>
+        <Alert.Description>{deleteError}</Alert.Description>
+      </Alert.Root>
+    {/if}
+
+    <AlertDialog.Footer>
+      <AlertDialog.Cancel disabled={deleting}>{text.tasks.cancel}</AlertDialog.Cancel>
+      <AlertDialog.Action
+        variant="destructive"
+        disabled={deleting}
+        onclick={confirmDeleteTask}
+      >
+        {deleting ? text.tasks.removing : text.tasks.remove}
+      </AlertDialog.Action>
+    </AlertDialog.Footer>
+  </AlertDialog.Content>
+</AlertDialog.Root>
 
 <style>
   @supports (-webkit-touch-callout: none) {

@@ -189,7 +189,38 @@ try {
     throw new Error("Completion without an assignment was accepted");
   }
 
-  console.log("Household tasks and completion RLS smoke test passed");
+  const { data: deletedTask, error: deleteTaskError } = await member
+    .from("tasks")
+    .delete()
+    .eq("id", taskId)
+    .eq("household_id", householdId)
+    .select("id")
+    .maybeSingle();
+  if (deleteTaskError) throw deleteTaskError;
+  if (deletedTask?.id !== taskId) {
+    throw new Error("Household member could not remove the task");
+  }
+
+  const [remainingTasks, remainingAssignments, remainingCompletions] =
+    await Promise.all([
+      owner.from("tasks").select("id").eq("id", taskId),
+      owner.from("task_assignments").select("task_id").eq("task_id", taskId),
+      owner.from("task_completions").select("task_id").eq("task_id", taskId),
+    ]);
+  const cascadeError =
+    remainingTasks.error ??
+    remainingAssignments.error ??
+    remainingCompletions.error;
+  if (cascadeError) throw cascadeError;
+  if (
+    remainingTasks.data.length !== 0 ||
+    remainingAssignments.data.length !== 0 ||
+    remainingCompletions.data.length !== 0
+  ) {
+    throw new Error("Removing a task did not cascade its related records");
+  }
+
+  console.log("Household task create, complete, and delete RLS smoke test passed");
 } finally {
   if (householdId) {
     await admin.from("households").delete().eq("id", householdId);
