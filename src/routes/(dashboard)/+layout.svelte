@@ -3,6 +3,7 @@
     CalendarDays,
     House,
     ListChecks,
+    LoaderCircle,
     MonitorPlay,
     NotebookTabs,
     Settings,
@@ -16,7 +17,9 @@
   } from "#lib/household-session.js";
   import { translations } from "#lib/i18n.js";
   import { provideWeatherStore } from "#lib/weather-store.js";
+  import * as Avatar from "#lib/components/ui/avatar/index.js";
   import { Button } from "#lib/components/ui/button/index.js";
+  import * as Card from "#lib/components/ui/card/index.js";
   import * as Sidebar from "#lib/components/ui/sidebar/index.js";
   import * as Tabs from "#lib/components/ui/tabs/index.js";
   import * as Tooltip from "#lib/components/ui/tooltip/index.js";
@@ -53,7 +56,23 @@
 </script>
 
 <div class="relative h-full w-full overflow-hidden">
-  {#if $householdSession.status !== "ready" && $householdSession.status !== "unconfigured"}
+  {#if $householdSession.status === "loading"}
+    <main class="grid h-full w-full place-items-center bg-muted/30 p-4">
+      <Card.Root class="w-full max-w-sm" size="sm">
+        <Card.Content class="flex min-h-48 flex-col items-center justify-center gap-4 text-center">
+          <Avatar.Root size="lg">
+            <Avatar.Fallback>
+              <House aria-hidden="true" />
+            </Avatar.Fallback>
+          </Avatar.Root>
+          <div class="grid justify-items-center gap-2">
+            <LoaderCircle class="size-6 animate-spin text-muted-foreground" aria-hidden="true" />
+            <p class="font-medium">{text.onboarding.loading}</p>
+          </div>
+        </Card.Content>
+      </Card.Root>
+    </main>
+  {:else if $householdSession.status !== "ready" && $householdSession.status !== "unconfigured"}
     <OnboardingView />
   {:else if screensaverActive}
     <div class="absolute inset-0" transition:fade={{ duration: 250 }}>
