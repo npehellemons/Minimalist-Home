@@ -31,6 +31,7 @@
     getDailyTasks,
     setTaskCompleted,
     subscribeToTasks,
+    updateTask,
     type DailyTask,
     type ChoreRecurrence,
     type TaskDayPart,
@@ -104,6 +105,7 @@
   let createOpen = $state(false);
   let creating = $state(false);
   let createError = $state("");
+  let editingTaskId = $state<string | null>(null);
   let taskTitle = $state("");
   let taskEmoji = $state("");
   let taskKind = $state<TaskKind>("routine");
@@ -195,6 +197,27 @@
     choreRecurrence = "none";
     selectedProfileIds = defaultProfile ? [defaultProfile.id] : [];
     createError = "";
+    editingTaskId = null;
+    createOpen = true;
+  }
+
+  function openEditTask(task: DailyTask) {
+    const schedule = task.weekdays ?? [];
+
+    taskTitle = task.title;
+    taskEmoji = task.emoji ?? "";
+    taskKind = task.kind;
+    taskDayPart = task.dayPart ?? selectedBlockId;
+    routineFrequency = schedule.length === everyDay.length ? "daily" : "selected-days";
+    taskWeekdays = [...schedule];
+    taskDueDate = task.dueDate ?? todayKey;
+    taskDueTime = task.dueTime?.slice(0, 5) ?? "";
+    choreRecurrence = task.recurrence;
+    selectedProfileIds = tasks
+      .filter((candidate) => candidate.id === task.id)
+      .map((candidate) => candidate.profileId);
+    createError = "";
+    editingTaskId = task.id;
     createOpen = true;
   }
 
@@ -226,7 +249,7 @@
     createError = "";
 
     try {
-      await createTask({
+      const taskInput = {
         householdId: session.household.id,
         title: taskTitle,
         emoji: taskEmoji,
@@ -238,12 +261,20 @@
         dueDate: taskDueDate,
         dueTime: taskDueTime,
         recurrence: choreRecurrence,
-      });
+      };
+
+      if (editingTaskId) {
+        await updateTask({ ...taskInput, taskId: editingTaskId });
+      } else {
+        await createTask(taskInput);
+      }
       createOpen = false;
       await loadTasks();
     } catch (error) {
-      console.error("Unable to create household task", error);
-      createError = text.tasks.createErrorDescription;
+      console.error("Unable to save household task", error);
+      createError = editingTaskId
+        ? text.tasks.updateErrorDescription
+        : text.tasks.createErrorDescription;
     } finally {
       creating = false;
     }
@@ -516,6 +547,9 @@
                           {/snippet}
                         </DropdownMenu.Trigger>
                         <DropdownMenu.Content align="end">
+                          <DropdownMenu.Item onSelect={() => openEditTask(task)}>
+                            {text.tasks.edit}
+                          </DropdownMenu.Item>
                           <DropdownMenu.Item
                             variant="destructive"
                             onSelect={() => openDeleteTask(task)}
@@ -539,8 +573,12 @@
 <Sheet.Root bind:open={createOpen}>
   <Sheet.Content class="w-screen max-w-none gap-2 overflow-x-hidden sm:w-3/4 sm:max-w-md">
     <Sheet.Header class="pb-2">
-      <Sheet.Title>{text.tasks.add}</Sheet.Title>
-      <Sheet.Description>{text.tasks.addDescription}</Sheet.Description>
+      <Sheet.Title>
+        {editingTaskId ? text.tasks.editTitle : text.tasks.add}
+      </Sheet.Title>
+      <Sheet.Description>
+        {editingTaskId ? text.tasks.editDescription : text.tasks.addDescription}
+      </Sheet.Description>
     </Sheet.Header>
 
     <form class="flex min-h-0 flex-1 flex-col" onsubmit={submitTask}>
@@ -710,7 +748,9 @@
 
           {#if createError}
             <Alert.Root variant="destructive">
-              <Alert.Title>{text.tasks.createError}</Alert.Title>
+              <Alert.Title>
+                {editingTaskId ? text.tasks.updateError : text.tasks.createError}
+              </Alert.Title>
               <Alert.Description>{createError}</Alert.Description>
             </Alert.Root>
           {/if}
@@ -726,7 +766,11 @@
             selectedProfileIds.length === 0 ||
             !routineScheduleIsValid}
         >
-          {creating ? text.tasks.creating : text.tasks.create}
+          {#if creating}
+            {editingTaskId ? text.tasks.saving : text.tasks.creating}
+          {:else}
+            {editingTaskId ? text.tasks.save : text.tasks.create}
+          {/if}
         </Button>
       </Sheet.Footer>
     </form>

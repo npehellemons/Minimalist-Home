@@ -19,6 +19,8 @@ export type DailyTask = {
   emoji: string | null;
   kind: TaskKind;
   dayPart: TaskDayPart | null;
+  weekdays: number[] | null;
+  dueDate: string | null;
   dueTime: string | null;
   recurrence: ChoreRecurrence;
   completed: boolean;
@@ -36,6 +38,10 @@ export type CreateTaskInput = {
   recurrence?: ChoreRecurrence;
   emoji?: string;
   description?: string;
+};
+
+export type UpdateTaskInput = CreateTaskInput & {
+  taskId: string;
 };
 
 function requireSupabase() {
@@ -153,6 +159,8 @@ export async function getDailyTasks(
           emoji: task.emoji,
           kind: task.kind as TaskKind,
           dayPart: task.day_part as TaskDayPart | null,
+          weekdays: task.weekdays,
+          dueDate: task.due_date,
           dueTime: task.due_time,
           recurrence: task.recurrence as ChoreRecurrence,
           completed: completionKeys.has(
@@ -183,6 +191,27 @@ export async function createTask(input: CreateTaskInput) {
 
   if (error) throw error;
   return data;
+}
+
+export async function updateTask(input: UpdateTaskInput) {
+  const client = requireSupabase();
+  const { error } = await client.rpc("update_task", {
+    target_household_id: input.householdId,
+    target_task_id: input.taskId,
+    task_title: input.title.trim(),
+    task_kind: input.kind,
+    task_profile_ids: input.profileIds,
+    task_day_part: input.kind === "routine" ? input.dayPart : null,
+    task_due_date: input.kind === "chore" ? input.dueDate : null,
+    task_due_time:
+      input.kind === "chore" && input.dueTime ? input.dueTime : null,
+    task_weekdays: input.kind === "routine" ? input.weekdays : null,
+    task_emoji: input.emoji?.trim() || null,
+    task_description: input.description?.trim() || null,
+    task_recurrence: input.kind === "chore" ? input.recurrence : "none",
+  });
+
+  if (error) throw error;
 }
 
 export async function setTaskCompleted(

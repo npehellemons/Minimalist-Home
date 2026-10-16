@@ -144,6 +144,39 @@ try {
     throw new Error("Recurring chore schedule was not stored correctly");
   }
 
+  const { error: updateChoreError } = await member.rpc("update_task", {
+    target_household_id: householdId,
+    target_task_id: choreId,
+    task_title: "Papier en glas buiten zetten",
+    task_kind: "chore",
+    task_profile_ids: [family.id, person.id],
+    task_due_date: "2026-11-01",
+    task_due_time: "19:30",
+    task_recurrence: "weekly",
+  });
+  if (updateChoreError) throw updateChoreError;
+
+  const [updatedChore, updatedChoreAssignments] = await Promise.all([
+    owner
+      .from("tasks")
+      .select("title, due_date, due_time, recurrence")
+      .eq("id", choreId)
+      .single(),
+    owner.from("task_assignments").select("profile_id").eq("task_id", choreId),
+  ]);
+  const updateVerificationError =
+    updatedChore.error ?? updatedChoreAssignments.error;
+  if (updateVerificationError) throw updateVerificationError;
+  if (
+    updatedChore.data.title !== "Papier en glas buiten zetten" ||
+    updatedChore.data.due_date !== "2026-11-01" ||
+    updatedChore.data.due_time !== "19:30:00" ||
+    updatedChore.data.recurrence !== "weekly" ||
+    updatedChoreAssignments.data.length !== 2
+  ) {
+    throw new Error("Task edits or assignment changes were not stored correctly");
+  }
+
   const { data: assignments, error: assignmentsError } = await member
     .from("task_assignments")
     .select("profile_id")
@@ -220,7 +253,9 @@ try {
     throw new Error("Removing a task did not cascade its related records");
   }
 
-  console.log("Household task create, complete, and delete RLS smoke test passed");
+  console.log(
+    "Household task create, update, complete, and delete RLS smoke test passed",
+  );
 } finally {
   if (householdId) {
     await admin.from("households").delete().eq("id", householdId);

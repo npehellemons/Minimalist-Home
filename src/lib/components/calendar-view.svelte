@@ -140,47 +140,46 @@
     }
 
     await Promise.all(
-      enabledFeeds
-        .map(async (feed) => {
-          try {
-            const { calendarData } = await fetchCalendarFeed(feed.url);
+      enabledFeeds.map(async (feed) => {
+        try {
+          const { calendarData } = await fetchCalendarFeed(feed.url);
 
-            if (generation !== calendarLoadGeneration) return;
+          if (generation !== calendarLoadGeneration) return;
 
-            const sourceId = `${feed.ownerId}-${feed.id}`;
-            const existingSource = calendarSources.get(sourceId);
+          const sourceId = `${feed.ownerId}-${feed.id}`;
+          const existingSource = calendarSources.get(sourceId);
 
-            if (
-              existingSource?.calendarData === calendarData &&
-              existingSource.color === feed.ownerColor
-            ) {
-              return;
-            }
-
-            if (existingSource) {
-              calendar?.getEventSourceById(`ical-${sourceId}`)?.remove();
-              URL.revokeObjectURL(existingSource.blobUrl);
-            }
-
-            const blobUrl = URL.createObjectURL(
-              new Blob([calendarData], { type: "text/calendar" }),
-            );
-            calendarSources.set(sourceId, {
-              blobUrl,
-              calendarData,
-              color: feed.ownerColor,
-            });
-            calendar?.addEventSource({
-              id: `ical-${sourceId}`,
-              url: blobUrl,
-              format: "ics",
-              color: feed.ownerColor,
-              contrastColor: readableTextColor(feed.ownerColor),
-            } as EventSourceInput);
-          } catch {
-            // A failing feed should not prevent other configured calendars loading.
+          if (
+            existingSource?.calendarData === calendarData &&
+            existingSource.color === feed.ownerColor
+          ) {
+            return;
           }
-        }),
+
+          if (existingSource) {
+            calendar?.getEventSourceById(`ical-${sourceId}`)?.remove();
+            URL.revokeObjectURL(existingSource.blobUrl);
+          }
+
+          const blobUrl = URL.createObjectURL(
+            new Blob([calendarData], { type: "text/calendar" }),
+          );
+          calendarSources.set(sourceId, {
+            blobUrl,
+            calendarData,
+            color: feed.ownerColor,
+          });
+          calendar?.addEventSource({
+            id: `ical-${sourceId}`,
+            url: blobUrl,
+            format: "ics",
+            color: feed.ownerColor,
+            contrastColor: readableTextColor(feed.ownerColor),
+          } as EventSourceInput);
+        } catch {
+          // A failing feed should not prevent other configured calendars loading.
+        }
+      }),
     );
   }
 
@@ -308,7 +307,9 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col bg-background">
-  <div class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b p-2 md:h-14 md:flex-nowrap md:px-4 md:py-0">
+  <div
+    class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b p-2 md:h-14 md:flex-nowrap md:px-4 md:py-0"
+  >
     <div class="flex items-center gap-1">
       <Button
         variant="ghost"
@@ -331,7 +332,9 @@
       </Button>
     </div>
 
-    <h2 class="order-first w-full truncate text-center text-base font-semibold capitalize md:order-none md:w-auto md:text-lg">
+    <h2
+      class="order-first w-full truncate text-center text-base font-semibold capitalize md:order-none md:w-auto md:text-lg"
+    >
       {calendarTitle}
     </h2>
 
@@ -399,7 +402,7 @@
 
 <style>
   :global([data-color-scheme="dark"]) {
-    --fc-forma-background: transparent !important;
+    --fc-forma-background: var(--popover) !important;
   }
 
   @media (max-width: 767px) {

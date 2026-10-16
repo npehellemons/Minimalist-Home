@@ -394,6 +394,23 @@ export type Database = {
         };
         Returns: string;
       };
+      update_task: {
+        Args: {
+          target_household_id: string;
+          target_task_id: string;
+          task_day_part?: string | null;
+          task_description?: string | null;
+          task_due_date?: string | null;
+          task_due_time?: string | null;
+          task_emoji?: string | null;
+          task_kind: string;
+          task_profile_ids: string[];
+          task_recurrence?: string | null;
+          task_title: string;
+          task_weekdays?: number[] | null;
+        };
+        Returns: undefined;
+      };
     };
     Enums: {
       [_ in never]: never;

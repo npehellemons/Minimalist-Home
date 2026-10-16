@@ -43,6 +43,7 @@ Implemented:
 - Repeat routines every day or on selected weekdays.
 - Repeat chores daily, weekly, or monthly from a chosen start date.
 - Remove a task through an overflow menu and confirmation dialog.
+- Edit task details, schedules, and assignments in the existing task Sheet.
 - Assign a task to one or more profiles.
 - Add an optional emoji for quick visual recognition.
 - Check and uncheck tasks with optimistic feedback.
@@ -54,7 +55,7 @@ Implemented:
 Current deliberate limits:
 
 - The board shows today only.
-- Tasks cannot yet be edited, skipped, or reordered in the interface.
+- Tasks cannot yet be skipped or reordered in the interface.
 - Chore recurrence currently uses a single start date. Weekly chores repeat on
   that weekday; monthly chores repeat on that day number and use the last day of
   shorter months when necessary.
@@ -62,8 +63,8 @@ Current deliberate limits:
 
 ## Phase 2: Management
 
-- Open a task details Sheet by tapping its row.
-- Edit title, emoji, description, assignment, type, and schedule.
+- Add a read-only task details view only if real use shows it is useful.
+- Add descriptions to the task Sheet and daily board.
 - Refine deletion when occurrence-level editing is introduced.
 - For recurring tasks, distinguish deleting one occurrence from the whole task.
 - Add descriptions without crowding the daily board.
