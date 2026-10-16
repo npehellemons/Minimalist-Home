@@ -51,6 +51,12 @@ export const translations = {
       daily: "Dagelijks",
       weekly: "Wekelijks",
       monthly: "Maandelijks",
+      recurrenceShort: {
+        none: "Eenmalig",
+        daily: "Dag",
+        weekly: "Week",
+        monthly: "Maand",
+      },
       choreRecurrence: {
         none: "Deze taak wordt alleen op de gekozen datum getoond.",
         daily: "Deze taak wordt vanaf de gekozen datum iedere dag getoond.",
@@ -241,6 +247,12 @@ export const translations = {
       daily: "Daily",
       weekly: "Weekly",
       monthly: "Monthly",
+      recurrenceShort: {
+        none: "Once",
+        daily: "Daily",
+        weekly: "Weekly",
+        monthly: "Monthly",
+      },
       choreRecurrence: {
         none: "This chore is only shown on the selected date.",
         daily: "This chore is shown every day from the selected date.",

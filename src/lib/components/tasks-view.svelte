@@ -473,17 +473,17 @@
 </div>
 
 <Sheet.Root bind:open={createOpen}>
-  <Sheet.Content class="w-screen max-w-none sm:w-3/4 sm:max-w-md">
-    <Sheet.Header>
+  <Sheet.Content class="w-screen max-w-none gap-2 overflow-x-hidden sm:w-3/4 sm:max-w-md">
+    <Sheet.Header class="pb-2">
       <Sheet.Title>{text.tasks.add}</Sheet.Title>
       <Sheet.Description>{text.tasks.addDescription}</Sheet.Description>
     </Sheet.Header>
 
     <form class="flex min-h-0 flex-1 flex-col" onsubmit={submitTask}>
       <ScrollArea.Root class="min-h-0 flex-1">
-        <div class="grid gap-5 px-4 py-2">
-          <div class="grid grid-cols-[5rem_1fr] gap-3">
-            <div class="grid gap-2">
+        <div class="grid gap-3 px-4 py-1">
+          <div class="grid grid-cols-[4rem_minmax(0,1fr)] gap-2">
+            <div class="grid min-w-0 gap-1.5">
               <Label for="task-emoji">{text.tasks.emoji}</Label>
               <Input
                 id="task-emoji"
@@ -493,7 +493,7 @@
                 placeholder="✓"
               />
             </div>
-            <div class="grid gap-2">
+            <div class="grid min-w-0 gap-1.5">
               <Label for="task-title">{text.tasks.title}</Label>
               <Input
                 id="task-title"
@@ -505,7 +505,7 @@
             </div>
           </div>
 
-          <div class="grid gap-2">
+          <div class="grid gap-1.5">
             <Label>{text.tasks.type}</Label>
             <Tabs.Root bind:value={taskKind}>
               <Tabs.List class="grid w-full grid-cols-2">
@@ -521,19 +521,19 @@
             </Tabs.Root>
           </div>
 
-          <div class="grid gap-2">
+          <div class="grid gap-1.5">
             <Label>{text.tasks.assignTo}</Label>
-            <div class="grid gap-2">
+            <div class="grid grid-cols-2 gap-1.5">
               {#each $appSettings.profiles as profile (profile.id)}
-                <label class="flex min-h-12 cursor-pointer items-center gap-3 rounded-md border px-3 py-2">
+                <label class="flex min-h-10 min-w-0 cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5">
                   <Checkbox
                     checked={selectedProfileIds.includes(profile.id)}
                     onCheckedChange={(checked) =>
                       toggleProfile(profile.id, checked === true)}
                     aria-label={profile.name}
                   />
-                  <ProfileAvatar name={profile.name} color={profile.color} />
-                  <span class="font-medium">{profile.name}</span>
+                  <ProfileAvatar name={profile.name} color={profile.color} size="sm" />
+                  <span class="truncate text-sm font-medium">{profile.name}</span>
                 </label>
               {/each}
             </div>
@@ -543,7 +543,7 @@
           </div>
 
           {#if taskKind === "routine"}
-            <div class="grid gap-2">
+            <div class="grid gap-1.5">
               <Label>{text.tasks.block}</Label>
               <Tabs.Root bind:value={taskDayPart}>
                 <Tabs.List class="grid w-full grid-cols-3">
@@ -554,7 +554,7 @@
               </Tabs.Root>
             </div>
 
-            <div class="grid gap-2">
+            <div class="grid gap-1.5">
               <Label>{text.tasks.repeats}</Label>
               <Tabs.Root bind:value={routineFrequency}>
                 <Tabs.List class="grid w-full grid-cols-2">
@@ -598,25 +598,44 @@
               </p>
             </div>
           {:else}
-            <div class="grid gap-3 sm:grid-cols-2">
-              <div class="grid gap-2">
+            <div class="grid min-w-0 gap-2 sm:grid-cols-2">
+              <div class="grid min-w-0 gap-1.5">
                 <Label for="task-due-date">{text.tasks.date}</Label>
-                <Input id="task-due-date" type="date" bind:value={taskDueDate} required />
+                <Input
+                  id="task-due-date"
+                  class="ios-temporal-input max-w-full"
+                  type="date"
+                  bind:value={taskDueDate}
+                  required
+                />
               </div>
-              <div class="grid gap-2">
+              <div class="grid min-w-0 gap-1.5">
                 <Label for="task-due-time">{text.tasks.timeOptional}</Label>
-                <Input id="task-due-time" type="time" bind:value={taskDueTime} />
+                <Input
+                  id="task-due-time"
+                  class="ios-temporal-input max-w-full"
+                  type="time"
+                  bind:value={taskDueTime}
+                />
               </div>
             </div>
 
-            <div class="grid gap-2">
+            <div class="grid gap-1.5">
               <Label>{text.tasks.repeats}</Label>
               <Tabs.Root bind:value={choreRecurrence}>
-                <Tabs.List class="grid h-auto w-full grid-cols-2 sm:grid-cols-4">
-                  <Tabs.Trigger value="none">{text.tasks.oneTime}</Tabs.Trigger>
-                  <Tabs.Trigger value="daily">{text.tasks.daily}</Tabs.Trigger>
-                  <Tabs.Trigger value="weekly">{text.tasks.weekly}</Tabs.Trigger>
-                  <Tabs.Trigger value="monthly">{text.tasks.monthly}</Tabs.Trigger>
+                <Tabs.List class="grid w-full grid-cols-4">
+                  <Tabs.Trigger class="min-w-0 px-1 text-xs" value="none">
+                    {text.tasks.recurrenceShort.none}
+                  </Tabs.Trigger>
+                  <Tabs.Trigger class="min-w-0 px-1 text-xs" value="daily">
+                    {text.tasks.recurrenceShort.daily}
+                  </Tabs.Trigger>
+                  <Tabs.Trigger class="min-w-0 px-1 text-xs" value="weekly">
+                    {text.tasks.recurrenceShort.weekly}
+                  </Tabs.Trigger>
+                  <Tabs.Trigger class="min-w-0 px-1 text-xs" value="monthly">
+                    {text.tasks.recurrenceShort.monthly}
+                  </Tabs.Trigger>
                 </Tabs.List>
               </Tabs.Root>
               <p class="text-xs text-muted-foreground">
@@ -634,7 +653,7 @@
         </div>
       </ScrollArea.Root>
 
-      <Sheet.Footer class="border-t">
+      <Sheet.Footer class="border-t py-3">
         <Button
           type="submit"
           size="lg"
@@ -649,3 +668,20 @@
     </form>
   </Sheet.Content>
 </Sheet.Root>
+
+<style>
+  @supports (-webkit-touch-callout: none) {
+    :global(.ios-temporal-input) {
+      inline-size: 100%;
+      min-inline-size: 0;
+      max-inline-size: 100%;
+      padding-inline: 0;
+    }
+
+    :global(.ios-temporal-input::-webkit-date-and-time-value) {
+      min-inline-size: 0;
+      padding-inline-start: 0.625rem;
+      text-align: start;
+    }
+  }
+</style>
