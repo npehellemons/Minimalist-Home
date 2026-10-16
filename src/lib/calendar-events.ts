@@ -1,0 +1,223 @@
+import ICAL from "ical.js";
+import { Temporal } from "temporal-polyfill";
+
+import type { HouseholdProfile } from "#lib/app-settings.js";
+import { fetchCalendarFeed } from "#lib/calendar-feed.js";
+
+export type HouseholdCalendarEvent = {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  allDay: boolean;
+  profileId: string;
+  profileName: string;
+  profileColor: string;
+  calendarName: string;
+};
+
+type ParsedEventCacheEntry = {
+  calendarData: string;
+  profileName: string;
+  profileColor: string;
+  calendarName: string;
+  timeZone: string;
+  rangeStart: number;
+  rangeEnd: number;
+  events: HouseholdCalendarEvent[];
+};
+
+const parsedEventCache = new Map<string, ParsedEventCacheEntry>();
+
+function calendarTimeToDate(time: ICAL.Time, fallbackTimeZone: string) {
+  if (time.isDate || time.zone.tzid === "floating") {
+    return new Date(
+      Temporal.ZonedDateTime.from({
+        timeZone: fallbackTimeZone,
+        year: time.year,
+        month: time.month,
+        day: time.day,
+        hour: time.isDate ? 0 : time.hour,
+        minute: time.isDate ? 0 : time.minute,
+        second: time.isDate ? 0 : time.second,
+      }).epochMilliseconds,
+    );
+  }
+
+  return time.toJSDate();
+}
+
+function isCancelled(event: ICAL.Event) {
+  return (
+    String(event.component.getFirstPropertyValue("status") ?? "").toUpperCase() ===
+    "CANCELLED"
+  );
+}
+
+function registerTimeZones(calendar: ICAL.Component) {
+  for (const component of calendar.getAllSubcomponents("vtimezone")) {
+    const tzid = component.getFirstPropertyValue("tzid");
+    if (typeof tzid !== "string" || ICAL.TimezoneService.has(tzid)) continue;
+
+    ICAL.TimezoneService.register(new ICAL.Timezone({ component, tzid }));
+  }
+}
+
+function eventInstance(
+  event: ICAL.Event,
+  occurrenceStart: ICAL.Time,
+  occurrenceEnd: ICAL.Time,
+  profile: HouseholdProfile,
+  calendarId: string,
+  calendarName: string,
+  timeZone: string,
+): HouseholdCalendarEvent {
+  const start = calendarTimeToDate(occurrenceStart, timeZone);
+  const end = calendarTimeToDate(occurrenceEnd, timeZone);
+
+  return {
+    id: `${profile.id}:${calendarId}:${event.uid}:${start.toISOString()}`,
+    title: event.summary || calendarName,
+    start,
+    end,
+    allDay: occurrenceStart.isDate,
+    profileId: profile.id,
+    profileName: profile.name,
+    profileColor: profile.color,
+    calendarName,
+  };
+}
+
+function eventOverlapsRange(
+  event: HouseholdCalendarEvent,
+  rangeStart: Date,
+  rangeEnd: Date,
+) {
+  return event.end > rangeStart && event.start < rangeEnd;
+}
+
+function parseEvents(
+  calendarData: string,
+  profile: HouseholdProfile,
+  calendarId: string,
+  calendarName: string,
+  rangeStart: Date,
+  rangeEnd: Date,
+  timeZone: string,
+) {
+  const calendar = new ICAL.Component(ICAL.parse(calendarData));
+  registerTimeZones(calendar);
+  const events: HouseholdCalendarEvent[] = [];
+
+  for (const component of calendar.getAllSubcomponents("vevent")) {
+    const sourceEvent = new ICAL.Event(component);
+    if (sourceEvent.isRecurrenceException() || isCancelled(sourceEvent)) continue;
+
+    if (!sourceEvent.isRecurring()) {
+      const event = eventInstance(
+        sourceEvent,
+        sourceEvent.startDate,
+        sourceEvent.endDate,
+        profile,
+        calendarId,
+        calendarName,
+        timeZone,
+      );
+      if (eventOverlapsRange(event, rangeStart, rangeEnd)) events.push(event);
+      continue;
+    }
+
+    const iterator = sourceEvent.iterator();
+    let occurrence = iterator.next();
+    let iterations = 0;
+
+    while (occurrence && iterations < 20_000) {
+      iterations += 1;
+      const details = sourceEvent.getOccurrenceDetails(occurrence);
+      const event = eventInstance(
+        details.item,
+        details.startDate,
+        details.endDate,
+        profile,
+        calendarId,
+        calendarName,
+        timeZone,
+      );
+
+      if (event.start >= rangeEnd) break;
+      if (!isCancelled(details.item) && eventOverlapsRange(event, rangeStart, rangeEnd)) {
+        events.push(event);
+      }
+      occurrence = iterator.next();
+    }
+  }
+
+  return events;
+}
+
+export async function getHouseholdCalendarEvents(
+  profiles: HouseholdProfile[],
+  rangeStart: Date,
+  rangeEnd: Date,
+  timeZone: string,
+) {
+  const feeds = profiles.flatMap((profile) =>
+    profile.calendars
+      .filter((calendar) => calendar.enabled && calendar.url.trim())
+      .map((calendar) => ({ profile, calendar })),
+  );
+  const results = await Promise.allSettled(
+    feeds.map(async ({ profile, calendar }) => {
+      const { calendarData } = await fetchCalendarFeed(calendar.url);
+      const cacheKey = `${profile.id}:${calendar.id}`;
+      const cached = parsedEventCache.get(cacheKey);
+
+      if (
+        cached?.calendarData === calendarData &&
+        cached.profileName === profile.name &&
+        cached.profileColor === profile.color &&
+        cached.calendarName === calendar.name &&
+        cached.timeZone === timeZone &&
+        cached.rangeStart === rangeStart.getTime() &&
+        cached.rangeEnd === rangeEnd.getTime()
+      ) {
+        return cached.events;
+      }
+
+      const events = parseEvents(
+        calendarData,
+        profile,
+        calendar.id,
+        calendar.name,
+        rangeStart,
+        rangeEnd,
+        timeZone,
+      );
+      parsedEventCache.set(cacheKey, {
+        calendarData,
+        profileName: profile.name,
+        profileColor: profile.color,
+        calendarName: calendar.name,
+        timeZone,
+        rangeStart: rangeStart.getTime(),
+        rangeEnd: rangeEnd.getTime(),
+        events,
+      });
+      return events;
+    }),
+  );
+
+  if (
+    feeds.length > 0 &&
+    results.every((result) => result.status === "rejected")
+  ) {
+    throw new Error("No calendar feed could be loaded");
+  }
+
+  return results
+    .flatMap((result) => (result.status === "fulfilled" ? result.value : []))
+    .sort((first, second) => {
+      if (first.allDay !== second.allDay) return first.allDay ? -1 : 1;
+      return first.start.getTime() - second.start.getTime();
+    });
+}

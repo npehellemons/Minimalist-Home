@@ -22,6 +22,14 @@ export const translations = {
       month: "Maand",
       allDay: "Hele dag",
     },
+    home: {
+      tasks: "Taken voor nu",
+      calendar: "Agenda voor nu",
+      noTasks: "Geen openstaande taken voor dit dagdeel.",
+      noCalendar: "Geen agenda-items meer voor dit dagdeel.",
+      calendarLoadError: "Agenda kon niet worden geladen",
+      calendarError: "Controleer de kalenderlinks en probeer het opnieuw.",
+    },
     tasks: {
       now: "Nu",
       block: "Dagdeel",
@@ -33,7 +41,7 @@ export const translations = {
       add: "Taak toevoegen",
       addDescription: "Maak een routine of een eenmalige of herhalende taak.",
       title: "Naam",
-      titlePlaceholder: "Bijvoorbeeld tanden poetsen",
+      titlePlaceholder: "Naam",
       emoji: "Emoji",
       type: "Type taak",
       routine: "Routine",
@@ -233,6 +241,14 @@ export const translations = {
       week: "Week",
       month: "Month",
       allDay: "All day",
+    },
+    home: {
+      tasks: "Tasks for now",
+      calendar: "Calendar for now",
+      noTasks: "No open tasks for this time of day.",
+      noCalendar: "No calendar events left for this time of day.",
+      calendarLoadError: "Calendar could not be loaded",
+      calendarError: "Check the calendar links and try again.",
     },
     tasks: {
       now: "Now",

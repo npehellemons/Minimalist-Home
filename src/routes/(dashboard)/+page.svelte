@@ -16,6 +16,7 @@
     appSettings,
   } from "#lib/app-settings.js";
   import CalendarView from "#lib/components/calendar-view.svelte";
+  import HomeView from "#lib/components/home-view.svelte";
   import SettingsView from "#lib/components/settings-view.svelte";
   import TasksView from "#lib/components/tasks-view.svelte";
   import { appLocale, translations } from "#lib/i18n.js";
@@ -208,6 +209,10 @@
   <CalendarView />
 {/snippet}
 
+{#snippet homeContent()}
+  <HomeView {now} />
+{/snippet}
+
 {#snippet tasksContent()}
   <TasksView />
 {/snippet}
@@ -217,7 +222,7 @@
 {/snippet}
 
 <Tabs.Content class="h-full p-0" value="home">
-  {@render dashboardPage("Home", "Home content", true)}
+  {@render dashboardPage("Home", "Home content", true, homeContent)}
 </Tabs.Content>
 <Tabs.Content class="h-full p-0" value="calendar">
   {@render dashboardPage("Calendar", "Calendar content", true, calendarContent)}
