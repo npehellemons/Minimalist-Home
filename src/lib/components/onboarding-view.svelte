@@ -14,6 +14,7 @@
     completeHouseholdOnboarding,
     currentLocalSettings,
     householdSession,
+    joinHousehold,
     refreshHouseholdSession,
     signIn,
     signOut,
@@ -31,6 +32,7 @@
   import { Separator } from "#lib/components/ui/separator/index.js";
   import { Switch } from "#lib/components/ui/switch/index.js";
   import * as Tabs from "#lib/components/ui/tabs/index.js";
+  import { onMount } from "svelte";
 
   let authMode = $state("signup");
   let email = $state("");
@@ -44,6 +46,8 @@
   let locationName = $state($appSettings.location.name);
   let language = $state<AppLanguage>($appSettings.language);
   let importExisting = $state(true);
+  let householdMode = $state<"create" | "join">("create");
+  let inviteCode = $state("");
   let text = $derived(translations[language].onboarding);
   let sourceSettings = $state(currentLocalSettings());
   let profileCount = $derived(sourceSettings.profiles.length);
@@ -56,6 +60,14 @@
   let progress = $derived(
     $householdSession.status === "needs-household" ? 66 : 33,
   );
+
+  onMount(() => {
+    const code = new URL(window.location.href).searchParams.get("invite");
+    if (!code) return;
+
+    inviteCode = code.toUpperCase();
+    householdMode = "join";
+  });
 
   async function submitAuth(event: SubmitEvent) {
     event.preventDefault();
@@ -132,6 +144,21 @@
       });
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : text.error;
+    } finally {
+      submitting = false;
+    }
+  }
+
+  async function acceptHouseholdInvite(event: SubmitEvent) {
+    event.preventDefault();
+    submitting = true;
+    errorMessage = "";
+
+    try {
+      await joinHousehold(inviteCode.trim());
+      window.history.replaceState({}, "", window.location.pathname);
+    } catch {
+      errorMessage = text.joinError;
     } finally {
       submitting = false;
     }
@@ -313,108 +340,166 @@
             </p>
           </div>
         {:else if $householdSession.status === "needs-household"}
-          <form class="grid gap-6" onsubmit={finishHousehold}>
-            <div class="grid gap-2">
-              <h1 class="text-2xl font-semibold">{text.householdTitle}</h1>
-              <p class="text-sm text-muted-foreground">
-                {text.householdDescription}
-              </p>
-            </div>
+          <div class="grid gap-6">
+            <Tabs.Root bind:value={householdMode}>
+              <Tabs.List class="grid w-full grid-cols-2">
+                <Tabs.Trigger value="create">{text.createHousehold}</Tabs.Trigger>
+                <Tabs.Trigger value="join">{text.joinHousehold}</Tabs.Trigger>
+              </Tabs.List>
+            </Tabs.Root>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-              <div class="grid gap-2">
-                <Label for="household-name">{text.householdName}</Label>
-                <Input
-                  id="household-name"
-                  bind:value={householdName}
-                  maxlength={80}
-                  required
-                />
-              </div>
-              <div class="grid gap-2">
-                <Label for="household-location">{text.location}</Label>
-                <Input
-                  id="household-location"
-                  bind:value={locationName}
-                  required
-                />
-              </div>
-            </div>
+            {#if householdMode === "create"}
+              <form class="grid gap-6" onsubmit={finishHousehold}>
+                <div class="grid gap-2">
+                  <h1 class="text-2xl font-semibold">{text.householdTitle}</h1>
+                  <p class="text-sm text-muted-foreground">
+                    {text.householdDescription}
+                  </p>
+                </div>
 
-            <div class="grid gap-2">
-              <Label>{text.language}</Label>
-              <Tabs.Root bind:value={language}>
-                <Tabs.List class="grid w-full grid-cols-2">
-                  <Tabs.Trigger value="nl">{text.dutch}</Tabs.Trigger>
-                  <Tabs.Trigger value="en">{text.english}</Tabs.Trigger>
-                </Tabs.List>
-              </Tabs.Root>
-            </div>
-
-            <Card.Root class="bg-muted/30" size="sm">
-              <Card.Header>
-                <div class="flex items-start justify-between gap-4">
-                  <div class="grid gap-1">
-                    <Card.Title>{text.importTitle}</Card.Title>
-                    <Card.Description>{text.importDescription}</Card.Description
-                    >
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <div class="grid gap-2">
+                    <Label for="household-name">{text.householdName}</Label>
+                    <Input
+                      id="household-name"
+                      bind:value={householdName}
+                      maxlength={80}
+                      required
+                    />
                   </div>
-                  <Switch
-                    bind:checked={importExisting}
-                    aria-label={text.importTitle}
+                  <div class="grid gap-2">
+                    <Label for="household-location">{text.location}</Label>
+                    <Input
+                      id="household-location"
+                      bind:value={locationName}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div class="grid gap-2">
+                  <Label>{text.language}</Label>
+                  <Tabs.Root bind:value={language}>
+                    <Tabs.List class="grid w-full grid-cols-2">
+                      <Tabs.Trigger value="nl">{text.dutch}</Tabs.Trigger>
+                      <Tabs.Trigger value="en">{text.english}</Tabs.Trigger>
+                    </Tabs.List>
+                  </Tabs.Root>
+                </div>
+
+                <Card.Root class="bg-muted/30" size="sm">
+                  <Card.Header>
+                    <div class="flex items-start justify-between gap-4">
+                      <div class="grid gap-1">
+                        <Card.Title>{text.importTitle}</Card.Title>
+                        <Card.Description>{text.importDescription}</Card.Description
+                        >
+                      </div>
+                      <Switch
+                        bind:checked={importExisting}
+                        aria-label={text.importTitle}
+                      />
+                    </div>
+                  </Card.Header>
+                  {#if importExisting}
+                    <Card.Content class="gap-3">
+                      <div class="flex flex-wrap items-center gap-2">
+                        {#each sourceSettings.profiles as profile (profile.id)}
+                          <ProfileAvatar
+                            name={profile.name}
+                            color={profile.color}
+                            size="sm"
+                          />
+                        {/each}
+                        <Badge variant="outline"
+                          >{profileCount} {text.profiles}</Badge
+                        >
+                        <Badge variant="outline"
+                          >{calendarCount} {text.calendars}</Badge
+                        >
+                      </div>
+                    </Card.Content>
+                  {/if}
+                </Card.Root>
+
+                {#if errorMessage}
+                  <Alert.Root variant="destructive">
+                    <Alert.Title>{text.error}</Alert.Title>
+                    <Alert.Description>{errorMessage}</Alert.Description>
+                  </Alert.Root>
+                {/if}
+
+                <div
+                  class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between"
+                >
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onclick={() => void signOut()}>{text.signOut}</Button
+                  >
+                  <Button
+                    type="submit"
+                    size="lg"
+                    disabled={submitting || !householdName.trim()}
+                  >
+                    {#if submitting}<LoaderCircle
+                        class="animate-spin"
+                        aria-hidden="true"
+                      />{/if}
+                    {submitting ? text.finishing : text.finish}
+                    {#if !submitting}<ArrowRight aria-hidden="true" />{/if}
+                  </Button>
+                </div>
+              </form>
+            {:else}
+              <form class="grid gap-6" onsubmit={acceptHouseholdInvite}>
+                <div class="grid gap-2">
+                  <h1 class="text-2xl font-semibold">{text.joinTitle}</h1>
+                  <p class="text-sm text-muted-foreground">
+                    {text.joinDescription}
+                  </p>
+                </div>
+
+                <div class="grid gap-2">
+                  <Label for="household-invite-code">{text.inviteCode}</Label>
+                  <Input
+                    id="household-invite-code"
+                    class="font-mono uppercase tracking-widest"
+                    placeholder="AB12-CD34-EF56"
+                    autocomplete="off"
+                    bind:value={inviteCode}
+                    required
                   />
                 </div>
-              </Card.Header>
-              {#if importExisting}
-                <Card.Content class="gap-3">
-                  <div class="flex flex-wrap items-center gap-2">
-                    {#each sourceSettings.profiles as profile (profile.id)}
-                      <ProfileAvatar
-                        name={profile.name}
-                        color={profile.color}
-                        size="sm"
-                      />
-                    {/each}
-                    <Badge variant="outline"
-                      >{profileCount} {text.profiles}</Badge
-                    >
-                    <Badge variant="outline"
-                      >{calendarCount} {text.calendars}</Badge
-                    >
-                  </div>
-                </Card.Content>
-              {/if}
-            </Card.Root>
 
-            {#if errorMessage}
-              <Alert.Root variant="destructive">
-                <Alert.Title>{text.error}</Alert.Title>
-                <Alert.Description>{errorMessage}</Alert.Description>
-              </Alert.Root>
+                {#if errorMessage}
+                  <Alert.Root variant="destructive">
+                    <Alert.Title>{text.error}</Alert.Title>
+                    <Alert.Description>{errorMessage}</Alert.Description>
+                  </Alert.Root>
+                {/if}
+
+                <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onclick={() => void signOut()}>{text.signOut}</Button
+                  >
+                  <Button
+                    type="submit"
+                    size="lg"
+                    disabled={submitting || !inviteCode.trim()}
+                  >
+                    {#if submitting}
+                      <LoaderCircle class="animate-spin" aria-hidden="true" />
+                    {/if}
+                    {submitting ? text.joining : text.join}
+                    {#if !submitting}<ArrowRight aria-hidden="true" />{/if}
+                  </Button>
+                </div>
+              </form>
             {/if}
-
-            <div
-              class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between"
-            >
-              <Button
-                type="button"
-                variant="ghost"
-                onclick={() => void signOut()}>{text.signOut}</Button
-              >
-              <Button
-                type="submit"
-                size="lg"
-                disabled={submitting || !householdName.trim()}
-              >
-                {#if submitting}<LoaderCircle
-                    class="animate-spin"
-                    aria-hidden="true"
-                  />{/if}
-                {submitting ? text.finishing : text.finish}
-                {#if !submitting}<ArrowRight aria-hidden="true" />{/if}
-              </Button>
-            </div>
-          </form>
+          </div>
         {/if}
       </Card.Content>
     </Card.Root>

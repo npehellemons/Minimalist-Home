@@ -56,6 +56,7 @@ export type Database = {
         Row: {
           created_at: string;
           household_id: string;
+          profile_id: string | null;
           role: string;
           user_id: string;
         };
@@ -63,12 +64,14 @@ export type Database = {
         Insert: {
           created_at?: string;
           household_id: string;
+          profile_id?: string | null;
           role?: string;
           user_id: string;
         };
         Update: {
           created_at?: string;
           household_id?: string;
+          profile_id?: string | null;
           role?: string;
           user_id?: string;
         };
@@ -79,6 +82,13 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "households";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "household_members_profile_household_fkey";
+            columns: ["profile_id", "household_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id", "household_id"];
           },
         ];
       };
@@ -197,6 +207,21 @@ export type Database = {
           household_longitude?: number;
           household_name: string;
           household_timezone?: string;
+        };
+        Returns: string;
+      };
+      create_household_invite: {
+        Args: {
+          invited_profile_id?: string | null;
+        };
+        Returns: {
+          expires_at: string;
+          invite_code: string;
+        }[];
+      };
+      join_household: {
+        Args: {
+          invite_code: string;
         };
         Returns: string;
       };

@@ -1,12 +1,15 @@
 <script lang="ts">
   import {
     CalendarDays,
+    Check,
+    Copy,
     Languages,
     LoaderCircle,
     MapPin,
     Palette,
     Plus,
     Trash2,
+    UserPlus,
     Users,
   } from "@lucide/svelte";
   import { onMount } from "svelte";
@@ -19,14 +22,17 @@
   } from "#lib/app-settings.js";
   import {
     createCalendarSource,
+    createHouseholdInvite,
     createProfile as createHouseholdProfile,
     deleteCalendarSource,
     deleteProfile as deleteHouseholdProfile,
+    getHouseholdMembers,
+    householdSession,
     updateCalendarSource,
     updateHouseholdSettings,
     updateProfile as updateHouseholdProfile,
   } from "#lib/household-session.js";
-  import { translations } from "#lib/i18n.js";
+  import { appLocale, translations } from "#lib/i18n.js";
   import ProfileAvatar from "#lib/components/profile-avatar.svelte";
   import { Badge } from "#lib/components/ui/badge/index.js";
   import { Button } from "#lib/components/ui/button/index.js";
@@ -44,7 +50,20 @@
   let locationQuery = $state("");
   let locationStatus = $state<"idle" | "loading" | "saved" | "error">("idle");
   let syncStatus = $state<"idle" | "saving" | "saved" | "error">("idle");
+  let members = $state<Awaited<ReturnType<typeof getHouseholdMembers>>>([]);
+  let inviteProfileId = $state<string | null>(null);
+  let inviteUrl = $state("");
+  let inviteExpiresAt = $state("");
+  let inviteStatus = $state<"idle" | "loading" | "error">("idle");
+  let inviteCopied = $state(false);
   let text = $derived(translations[$appSettings.language]);
+  let canManageHousehold = $derived(
+    $householdSession.membership?.role === "owner" ||
+      $householdSession.membership?.role === "admin",
+  );
+  let personalProfiles = $derived(
+    $appSettings.profiles.filter((profile) => !profile.family),
+  );
 
   async function persist(action: () => Promise<unknown>) {
     syncStatus = "saving";
@@ -123,6 +142,44 @@
     appSettings.update((settings) => ({ ...settings, colorMode }));
   }
 
+  async function loadMembers() {
+    try {
+      members = await getHouseholdMembers();
+    } catch (error) {
+      console.error("Unable to load household members", error);
+    }
+  }
+
+  async function makeInvite() {
+    inviteStatus = "loading";
+    inviteCopied = false;
+
+    try {
+      const invitation = await createHouseholdInvite(inviteProfileId);
+      const url = new URL(window.location.origin);
+      url.searchParams.set("invite", invitation.code);
+      inviteUrl = url.toString();
+      inviteExpiresAt = invitation.expiresAt;
+      inviteStatus = "idle";
+    } catch (error) {
+      console.error("Unable to create household invitation", error);
+      inviteStatus = "error";
+    }
+  }
+
+  async function copyInvite() {
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      inviteCopied = true;
+    } catch (error) {
+      console.error("Unable to copy household invitation", error);
+    }
+  }
+
+  function memberProfile(profileId: string | null) {
+    return $appSettings.profiles.find((profile) => profile.id === profileId);
+  }
+
   async function saveLocation(event: SubmitEvent) {
     event.preventDefault();
     const query = locationQuery.trim();
@@ -169,6 +226,7 @@
 
   onMount(() => {
     locationQuery = $appSettings.location.name;
+    void loadMembers();
   });
 </script>
 
@@ -184,6 +242,117 @@
     </div>
 
     <Card.Root size="sm">
+      <Card.Header class="border-b">
+        <div class="flex items-center gap-2">
+          <UserPlus class="size-5" aria-hidden="true" />
+          <Card.Title>{text.settings.householdAccess}</Card.Title>
+          <Badge variant="outline">{members.length} {text.settings.memberCount}</Badge>
+        </div>
+        <Card.Description>{text.settings.householdAccessDescription}</Card.Description>
+      </Card.Header>
+      <Card.Content class="gap-4">
+        <div class="grid gap-1">
+          {#each members as member (member.user_id)}
+            {@const profile = memberProfile(member.profile_id)}
+            <div class="flex min-h-12 items-center gap-3 border-b py-2 last:border-b-0">
+              {#if profile}
+                <ProfileAvatar name={profile.name} color={profile.color} />
+              {:else}
+                <Button variant="secondary" size="icon" disabled>
+                  <Users aria-hidden="true" />
+                </Button>
+              {/if}
+              <div class="min-w-0 flex-1">
+                <p class="truncate font-medium">
+                  {profile?.name ?? text.settings.unassigned}
+                </p>
+                {#if member.user_id === $householdSession.user?.id}
+                  <p class="text-xs text-muted-foreground">{text.settings.you}</p>
+                {/if}
+              </div>
+              <Badge variant="secondary">
+                {text.settings[member.role as "owner" | "admin" | "member"]}
+              </Badge>
+            </div>
+          {/each}
+        </div>
+
+        {#if canManageHousehold}
+          <Separator />
+          <div class="grid gap-3">
+            <Label>{text.settings.inviteProfile}</Label>
+            <div class="flex flex-wrap gap-2" role="group" aria-label={text.settings.inviteProfile}>
+              <Button
+                variant={inviteProfileId === null ? "default" : "outline"}
+                size="sm"
+                aria-pressed={inviteProfileId === null}
+                onclick={() => (inviteProfileId = null)}
+              >
+                {text.settings.unassigned}
+              </Button>
+              {#each personalProfiles as profile (profile.id)}
+                <Button
+                  variant={inviteProfileId === profile.id ? "default" : "outline"}
+                  size="sm"
+                  aria-pressed={inviteProfileId === profile.id}
+                  onclick={() => (inviteProfileId = profile.id)}
+                >
+                  <ProfileAvatar name={profile.name} color={profile.color} size="sm" />
+                  {profile.name}
+                </Button>
+              {/each}
+            </div>
+            <Button
+              class="w-full sm:w-fit"
+              disabled={inviteStatus === "loading"}
+              onclick={makeInvite}
+            >
+              {#if inviteStatus === "loading"}
+                <LoaderCircle class="animate-spin" aria-hidden="true" />
+                {text.settings.creatingInvite}
+              {:else}
+                <UserPlus aria-hidden="true" />
+                {text.settings.createInvite}
+              {/if}
+            </Button>
+
+            {#if inviteStatus === "error"}
+              <p class="text-sm text-destructive">{text.settings.error}</p>
+            {:else if inviteUrl}
+              <div class="grid gap-2 rounded-md border bg-muted/30 p-3">
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-sm font-medium">{text.settings.inviteReady}</p>
+                  <span class="text-xs text-muted-foreground">
+                    {text.settings.inviteExpires}
+                    {new Intl.DateTimeFormat(appLocale($appSettings.language), {
+                      dateStyle: "medium",
+                    }).format(new Date(inviteExpiresAt))}
+                  </span>
+                </div>
+                <div class="flex min-w-0 gap-2">
+                  <Input class="min-w-0 font-mono text-xs" value={inviteUrl} readonly />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    aria-label={inviteCopied ? text.settings.copied : text.settings.copyInvite}
+                    onclick={copyInvite}
+                  >
+                    {#if inviteCopied}
+                      <Check aria-hidden="true" />
+                    {:else}
+                      <Copy aria-hidden="true" />
+                    {/if}
+                  </Button>
+                </div>
+              </div>
+            {/if}
+          </div>
+        {/if}
+      </Card.Content>
+    </Card.Root>
+
+    {#if canManageHousehold}
+      <Card.Root size="sm">
       <Card.Header class="border-b">
         <div class="flex items-center gap-2">
           <Users class="size-5" aria-hidden="true" />
@@ -380,10 +549,12 @@
           </Button>
         </form>
       </Card.Footer>
-    </Card.Root>
+      </Card.Root>
+    {/if}
 
-    <div class="grid gap-4 lg:grid-cols-2">
-      <Card.Root size="sm">
+    <div class={canManageHousehold ? "grid gap-4 lg:grid-cols-2" : "grid gap-4"}>
+      {#if canManageHousehold}
+        <Card.Root size="sm">
         <Card.Header class="border-b">
           <div class="flex items-center gap-2">
             <MapPin class="size-5" aria-hidden="true" />
@@ -422,10 +593,12 @@
             </div>
           </form>
         </Card.Content>
-      </Card.Root>
+        </Card.Root>
+      {/if}
 
       <div class="grid gap-4">
-        <Card.Root size="sm">
+        {#if canManageHousehold}
+          <Card.Root size="sm">
           <Card.Header class="border-b">
             <div class="flex items-center gap-2">
               <Languages class="size-5" aria-hidden="true" />
@@ -456,7 +629,8 @@
               >
             </div>
           </Card.Content>
-        </Card.Root>
+          </Card.Root>
+        {/if}
 
         <Card.Root size="sm">
           <Card.Header class="border-b">

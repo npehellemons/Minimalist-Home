@@ -34,6 +34,11 @@ export type HouseholdSessionState = {
   error: string | null;
 };
 
+export type HouseholdInvite = {
+  code: string;
+  expiresAt: string;
+};
+
 const initialState: HouseholdSessionState = {
   status: isSupabaseConfigured ? "loading" : "unconfigured",
   user: null,
@@ -334,7 +339,7 @@ export async function signUp(email: string, password: string) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { emailRedirectTo: window.location.origin },
+    options: { emailRedirectTo: window.location.href },
   });
   if (error) throw error;
   return { needsConfirmation: !data.session };
@@ -378,6 +383,45 @@ export async function completeHouseholdOnboarding({
 
   if (error) throw error;
   await refreshHouseholdSession();
+}
+
+export async function createHouseholdInvite(profileId: string | null) {
+  if (!supabase) throw new Error("Supabase is not configured");
+  const { data, error } = await supabase.rpc("create_household_invite", {
+    invited_profile_id: profileId,
+  });
+
+  if (error) throw error;
+  const invitation = data?.[0];
+  if (!invitation) throw new Error("Invite could not be created");
+
+  return {
+    code: invitation.invite_code,
+    expiresAt: invitation.expires_at,
+  } satisfies HouseholdInvite;
+}
+
+export async function joinHousehold(inviteCode: string) {
+  if (!supabase) throw new Error("Supabase is not configured");
+  const { error } = await supabase.rpc("join_household", {
+    invite_code: inviteCode,
+  });
+
+  if (error) throw error;
+  await refreshHouseholdSession();
+}
+
+export async function getHouseholdMembers() {
+  if (!supabase) throw new Error("Supabase is not configured");
+  const { household } = readyHousehold();
+  const { data, error } = await supabase
+    .from("household_members")
+    .select("*")
+    .eq("household_id", household.id)
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  return data;
 }
 
 export function currentLocalSettings() {
