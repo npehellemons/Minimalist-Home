@@ -381,92 +381,96 @@
     viewportClass="snap-x snap-mandatory scroll-smooth"
     class="min-h-0 min-w-0 w-full flex-1 bg-muted/30"
   >
-    <div class="flex h-full min-w-full gap-4 p-4">
+    <div class="flex h-full min-w-full md:gap-4 md:p-4">
       {#each visibleProfiles as profile (profile.id)}
         {@const profileTasks = tasksForProfile(profile)}
         {@const completed = completedCount(profileTasks)}
-        <Card.Root
-          class="h-full min-h-0 min-w-0 shrink-0 snap-start basis-[calc(100vw-2rem)] gap-0 rounded-lg py-0 md:snap-none md:basis-[var(--profile-card-basis)]"
+        <div
+          class="h-full w-full min-w-0 shrink-0 snap-center p-4 md:w-auto md:snap-none md:basis-[var(--profile-card-basis)] md:p-0"
           style={`--profile-card-basis: ${profileCardBasis}`}
-          size="sm"
-          role="region"
-          aria-label={`${text.tasks.for} ${profile.name}`}
         >
-          <Card.Header class="flex min-h-16 shrink-0 flex-row items-center justify-between border-b px-4 pt-(--card-spacing)">
-            <div class="flex min-w-0 items-center gap-3">
-              <ProfileAvatar name={profile.name} color={profile.color} />
-              <Card.Title class="truncate">{profile.name}</Card.Title>
-            </div>
-            <Badge
-              variant="secondary"
-              class="size-10 rounded-full p-0 text-sm font-semibold tabular-nums"
-              aria-label={`${completed} / ${profileTasks.length} ${text.tasks.completed}`}
-            >
-              {completed}/{profileTasks.length}
-            </Badge>
-          </Card.Header>
+          <Card.Root
+            class="h-full min-h-0 min-w-0 gap-0 rounded-lg py-0"
+            size="sm"
+            role="region"
+            aria-label={`${text.tasks.for} ${profile.name}`}
+          >
+            <Card.Header class="flex min-h-16 shrink-0 flex-row items-center justify-between border-b px-4 pt-(--card-spacing)">
+              <div class="flex min-w-0 items-center gap-3">
+                <ProfileAvatar name={profile.name} color={profile.color} />
+                <Card.Title class="truncate">{profile.name}</Card.Title>
+              </div>
+              <Badge
+                variant="secondary"
+                class="size-10 rounded-full p-0 text-sm font-semibold tabular-nums"
+                aria-label={`${completed} / ${profileTasks.length} ${text.tasks.completed}`}
+              >
+                {completed}/{profileTasks.length}
+              </Badge>
+            </Card.Header>
 
-          <ScrollArea.Root class="min-h-0 flex-1">
-            <Card.Content class="gap-0 divide-y px-0">
-              {#if loading}
-                {#each Array(3) as _}
-                  <div class="flex min-h-16 items-center gap-3 px-4 py-3">
-                    <Skeleton class="size-6 rounded" />
-                    <div class="grid flex-1 gap-2">
-                      <Skeleton class="h-4 w-2/3" />
-                      <Skeleton class="h-3 w-1/3" />
+            <ScrollArea.Root class="min-h-0 flex-1">
+              <Card.Content class="gap-0 divide-y px-0">
+                {#if loading}
+                  {#each Array(3) as _}
+                    <div class="flex min-h-16 items-center gap-3 px-4 py-3">
+                      <Skeleton class="size-6 rounded" />
+                      <div class="grid flex-1 gap-2">
+                        <Skeleton class="h-4 w-2/3" />
+                        <Skeleton class="h-3 w-1/3" />
+                      </div>
                     </div>
+                  {/each}
+                {:else if profileTasks.length === 0}
+                  <div class="grid min-h-40 place-content-center gap-2 px-6 text-center text-muted-foreground">
+                    <ListChecks class="mx-auto size-7" aria-hidden="true" />
+                    <p class="text-sm">{text.tasks.empty}</p>
                   </div>
-                {/each}
-              {:else if profileTasks.length === 0}
-                <div class="grid min-h-40 place-content-center gap-2 px-6 text-center text-muted-foreground">
-                  <ListChecks class="mx-auto size-7" aria-hidden="true" />
-                  <p class="text-sm">{text.tasks.empty}</p>
-                </div>
-              {:else}
-                {#each sortedTasks(profileTasks) as task (`${task.id}-${task.profileId}`)}
-                  {@const pendingKey = `${task.id}\u0000${task.profileId}`}
-                  <label
-                    class="flex min-h-16 cursor-pointer items-center gap-3 px-4 py-3 text-sm"
-                    class:text-muted-foreground={task.completed}
-                  >
-                    <Checkbox
-                      class="size-6"
-                      checked={task.completed}
-                      disabled={pendingCompletions.includes(pendingKey)}
-                      aria-label={task.title}
-                      onCheckedChange={(checked) =>
-                        void toggleTask(task, checked === true)}
-                    />
-                    {#if task.emoji}
-                      <span class="text-xl" aria-hidden="true">{task.emoji}</span>
-                    {/if}
-                    <span class="min-w-0 flex-1">
-                      <span class="block font-medium" class:line-through={task.completed}>
-                        {task.title}
-                      </span>
-                      <span class="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                        {#if task.kind === "routine"}
-                          <Repeat2 class="size-3" aria-hidden="true" />
-                          {text.tasks.routine}
-                        {:else}
-                          <ListChecks class="size-3" aria-hidden="true" />
-                          {text.tasks.chore}
-                          {#if task.dueTime}
-                            · {task.dueTime.slice(0, 5)}
+                {:else}
+                  {#each sortedTasks(profileTasks) as task (`${task.id}-${task.profileId}`)}
+                    {@const pendingKey = `${task.id}\u0000${task.profileId}`}
+                    <label
+                      class="flex min-h-16 cursor-pointer items-center gap-3 px-4 py-3 text-sm"
+                      class:text-muted-foreground={task.completed}
+                    >
+                      <Checkbox
+                        class="size-6"
+                        checked={task.completed}
+                        disabled={pendingCompletions.includes(pendingKey)}
+                        aria-label={task.title}
+                        onCheckedChange={(checked) =>
+                          void toggleTask(task, checked === true)}
+                      />
+                      {#if task.emoji}
+                        <span class="text-xl" aria-hidden="true">{task.emoji}</span>
+                      {/if}
+                      <span class="min-w-0 flex-1">
+                        <span class="block font-medium" class:line-through={task.completed}>
+                          {task.title}
+                        </span>
+                        <span class="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                          {#if task.kind === "routine"}
+                            <Repeat2 class="size-3" aria-hidden="true" />
+                            {text.tasks.routine}
+                          {:else}
+                            <ListChecks class="size-3" aria-hidden="true" />
+                            {text.tasks.chore}
+                            {#if task.dueTime}
+                              · {task.dueTime.slice(0, 5)}
+                            {/if}
+                            {#if task.recurrence !== "none"}
+                              · {text.tasks[task.recurrence]}
+                            {/if}
                           {/if}
-                          {#if task.recurrence !== "none"}
-                            · {text.tasks[task.recurrence]}
-                          {/if}
-                        {/if}
+                        </span>
                       </span>
-                    </span>
-                  </label>
-                {/each}
-              {/if}
-            </Card.Content>
-          </ScrollArea.Root>
-        </Card.Root>
+                    </label>
+                  {/each}
+                {/if}
+              </Card.Content>
+            </ScrollArea.Root>
+          </Card.Root>
+        </div>
       {/each}
     </div>
   </ScrollArea.Root>
