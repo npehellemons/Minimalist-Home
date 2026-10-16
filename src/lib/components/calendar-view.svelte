@@ -41,12 +41,21 @@
   let selectedEventTime = $state("");
   let selectedEventLocation = $state("");
   let text = $derived(translations[$appSettings.language]);
+  function profilesForSelection(
+    profiles: HouseholdProfile[],
+    selectedProfileId: string,
+  ) {
+    const selectedProfile = profiles.find(
+      (profile) => profile.id === selectedProfileId,
+    );
+
+    return selectedProfile?.family
+      ? profiles
+      : profiles.filter((profile) => profile.id === selectedProfileId);
+  }
+
   let visibleProfiles = $derived(
-    $activeProfileId === "family"
-      ? $appSettings.profiles
-      : $appSettings.profiles.filter(
-          (profile) => profile.id === $activeProfileId,
-        ),
+    profilesForSelection($appSettings.profiles, $activeProfileId),
   );
   const calendarSources = new Map<
     string,
@@ -252,12 +261,7 @@
       [appSettings, activeProfileId],
       ([settings, selectedProfileId]) => ({
         settings,
-        profiles:
-          selectedProfileId === "family"
-            ? settings.profiles
-            : settings.profiles.filter(
-                (profile) => profile.id === selectedProfileId,
-              ),
+        profiles: profilesForSelection(settings.profiles, selectedProfileId),
       }),
     );
     const unsubscribeSettings = calendarSettings.subscribe(
@@ -304,7 +308,7 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col bg-background">
-  <div class="flex h-14 shrink-0 items-center justify-between border-b px-4">
+  <div class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b p-2 md:h-14 md:flex-nowrap md:px-4 md:py-0">
     <div class="flex items-center gap-1">
       <Button
         variant="ghost"
@@ -327,10 +331,12 @@
       </Button>
     </div>
 
-    <h2 class="text-lg font-semibold capitalize">{calendarTitle}</h2>
+    <h2 class="order-first w-full truncate text-center text-base font-semibold capitalize md:order-none md:w-auto md:text-lg">
+      {calendarTitle}
+    </h2>
 
-    <div class="flex items-center gap-2">
-      <div class="flex items-center gap-1.5">
+    <div class="flex min-w-0 items-center gap-2">
+      <div class="hidden items-center gap-1.5 lg:flex">
         {#each visibleProfiles.filter( (profile) => profile.calendars.some((feed) => feed.enabled), ) as profile (profile.id)}
           <Badge variant="outline" class="gap-1.5 font-normal">
             <span
@@ -343,7 +349,7 @@
         {/each}
       </div>
       <div
-        class="flex h-9 items-center gap-0.5 rounded-lg bg-muted p-[3px]"
+        class="grid h-9 grid-cols-4 items-center gap-0.5 rounded-lg bg-muted p-[3px]"
         role="group"
         aria-label={text.calendar.view}
       >
@@ -352,8 +358,8 @@
             variant={currentView === view.id ? "default" : "ghost"}
             size="sm"
             class={currentView === view.id
-              ? "h-7 shadow-sm ring-1 ring-primary/25"
-              : "h-7 text-muted-foreground"}
+              ? "h-7 px-2 shadow-sm ring-1 ring-primary/25"
+              : "h-7 px-2 text-muted-foreground"}
             aria-pressed={currentView === view.id}
             onclick={() => changeView(view.id)}
           >
@@ -364,7 +370,7 @@
     </div>
   </div>
 
-  <div class="min-h-0 flex-1 p-4 bg-muted/30">
+  <div class="calendar-shell min-h-0 flex-1 bg-muted/30 p-1.5 sm:p-4">
     <div class="h-full min-h-0" bind:this={calendarElement}></div>
   </div>
 
@@ -394,5 +400,11 @@
 <style>
   :global([data-color-scheme="dark"]) {
     --fc-forma-background: transparent !important;
+  }
+
+  @media (max-width: 767px) {
+    .calendar-shell :global(.fc) {
+      font-size: 0.75rem;
+    }
   }
 </style>

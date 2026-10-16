@@ -174,7 +174,7 @@
 </script>
 
 <ScrollArea.Root class="h-full bg-muted/30">
-  <div class="mx-auto grid gap-4 p-6">
+  <div class="mx-auto grid gap-4 p-3 sm:p-6">
     <div class="flex items-center justify-between gap-3">
       <h2 class="text-2xl font-semibold">{text.settings.title}</h2>
       {#if syncStatus !== "idle"}
@@ -195,9 +195,7 @@
       <Card.Content class="gap-4">
         {#each $appSettings.profiles as profile (profile.id)}
           <section class="grid gap-4 border-b pb-5 last:border-b-0">
-            <div
-              class="grid grid-cols-[auto_1fr_7rem_auto_auto] items-end gap-3"
-            >
+            <div class="flex items-start gap-3">
               <Avatar.Root size="lg">
                 <Avatar.Fallback
                   style={`background-color: ${profile.color}; color: white`}
@@ -205,75 +203,73 @@
                   {profile.avatar}
                 </Avatar.Fallback>
               </Avatar.Root>
-              <div class="grid gap-2">
-                <Label for={`${profile.id}-name`}
-                  >{text.settings.profileName}</Label
-                >
-                <Input
-                  id={`${profile.id}-name`}
-                  value={profile.name}
-                  onchange={(event) =>
-                    updateProfile(profile.id, {
-                      name: event.currentTarget.value,
-                    })}
-                />
+              <div class="grid min-w-0 flex-1 gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_auto] sm:items-end">
+                <div class="grid gap-2">
+                  <Label for={`${profile.id}-name`}>{text.settings.profileName}</Label>
+                  <Input
+                    id={`${profile.id}-name`}
+                    value={profile.name}
+                    onchange={(event) =>
+                      updateProfile(profile.id, {
+                        name: event.currentTarget.value,
+                      })}
+                  />
+                </div>
+                <div class="grid gap-2">
+                  <Label for={`${profile.id}-avatar`}>{text.settings.profileAvatar}</Label>
+                  <Input
+                    id={`${profile.id}-avatar`}
+                    maxlength={2}
+                    value={profile.avatar}
+                    onchange={(event) =>
+                      updateProfile(profile.id, {
+                        avatar: event.currentTarget.value,
+                      })}
+                  />
+                </div>
+                <div class="grid gap-2">
+                  <Label for={`${profile.id}-color`}>{text.settings.profileColor}</Label>
+                  <input
+                    id={`${profile.id}-color`}
+                    class="h-9 w-12 cursor-pointer rounded-md border bg-background p-1"
+                    type="color"
+                    value={profile.color}
+                    onchange={(event) =>
+                      updateProfile(profile.id, {
+                        color: event.currentTarget.value,
+                      })}
+                  />
+                </div>
               </div>
-              <div class="grid gap-2">
-                <Label for={`${profile.id}-avatar`}
-                  >{text.settings.profileAvatar}</Label
-                >
-                <Input
-                  id={`${profile.id}-avatar`}
-                  maxlength={2}
-                  value={profile.avatar}
-                  onchange={(event) =>
-                    updateProfile(profile.id, {
-                      avatar: event.currentTarget.value,
-                    })}
-                />
+              <div class="shrink-0">
+                {#if profile.family}
+                  <Badge variant="secondary" class="hidden sm:inline-flex">{text.settings.family}</Badge>
+                {:else}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={text.settings.removeProfile}
+                    onclick={() => removeProfile(profile.id)}
+                  >
+                    <Trash2 aria-hidden="true" />
+                  </Button>
+                {/if}
               </div>
-              <div class="grid gap-2">
-                <Label for={`${profile.id}-color`}
-                  >{text.settings.profileColor}</Label
-                >
-                <input
-                  id={`${profile.id}-color`}
-                  class="h-9 w-12 cursor-pointer rounded-md border bg-background p-1"
-                  type="color"
-                  value={profile.color}
-                  onchange={(event) =>
-                    updateProfile(profile.id, {
-                      color: event.currentTarget.value,
-                    })}
-                />
-              </div>
-              {#if profile.family}
-                <Badge variant="secondary">{text.settings.family}</Badge>
-              {:else}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={text.settings.removeProfile}
-                  onclick={() => removeProfile(profile.id)}
-                >
-                  <Trash2 aria-hidden="true" />
-                </Button>
-              {/if}
             </div>
 
-            <div class="ml-14 grid gap-3 rounded-md border bg-muted/30 p-3">
-              <div class="flex items-center gap-2">
+            <div class="grid gap-3 rounded-md border bg-muted/30 p-3 sm:ml-14">
+              <div class="flex flex-wrap items-center gap-2">
                 <CalendarDays class="size-4" aria-hidden="true" />
                 <h3 class="text-sm font-medium">{text.settings.calendars}</h3>
                 <Badge variant="outline">{profile.calendars.length}</Badge>
-                <p class="ml-auto text-xs text-muted-foreground">
+                <p class="w-full text-xs text-muted-foreground sm:ml-auto sm:w-auto">
                   {text.settings.calendarsDescription}
                 </p>
               </div>
 
               {#each profile.calendars as calendar (calendar.id)}
-                <div class="grid grid-cols-[1fr_2fr_auto_auto] items-end gap-3">
-                  <div class="grid gap-2">
+                <div class="grid grid-cols-[1fr_auto] items-end gap-3 sm:grid-cols-[1fr_2fr_auto_auto]">
+                  <div class="col-span-2 grid gap-2 sm:col-span-1">
                     <Label for={`${profile.id}-${calendar.id}-name`}>
                       {text.settings.calendarName}
                     </Label>
@@ -286,7 +282,7 @@
                         })}
                     />
                   </div>
-                  <div class="grid min-w-0 gap-2">
+                  <div class="col-span-2 grid min-w-0 gap-2 sm:col-span-1">
                     <Label for={`${profile.id}-${calendar.id}-url`}>
                       {text.settings.calendarUrl}
                     </Label>
@@ -322,7 +318,7 @@
               {/each}
 
               <form
-                class="grid grid-cols-[1fr_2fr_auto] items-end gap-3"
+                class="grid gap-3 sm:grid-cols-[1fr_2fr_auto] sm:items-end"
                 onsubmit={(event) => addCalendar(event, profile.id)}
               >
                 <div class="grid gap-2">
@@ -350,7 +346,7 @@
                     required
                   />
                 </div>
-                <Button type="submit">
+                <Button type="submit" class="w-full sm:w-auto">
                   <Plus aria-hidden="true" />
                   {text.settings.addCalendar}
                 </Button>
@@ -360,7 +356,7 @@
         {/each}
 
         <form
-          class="grid grid-cols-[1fr_7rem_auto_auto] items-end gap-3"
+          class="grid gap-3 sm:grid-cols-[1fr_7rem_auto_auto] sm:items-end"
           onsubmit={addProfile}
         >
           <div class="grid gap-2">
@@ -385,7 +381,7 @@
               bind:value={profileColor}
             />
           </div>
-          <Button type="submit">
+          <Button type="submit" class="w-full sm:w-auto">
             <Plus aria-hidden="true" />
             {text.settings.addProfile}
           </Button>
@@ -393,7 +389,7 @@
       </Card.Content>
     </Card.Root>
 
-    <div class="grid grid-cols-2 gap-4">
+    <div class="grid gap-4 lg:grid-cols-2">
       <Card.Root size="sm">
         <Card.Header class="border-b">
           <div class="flex items-center gap-2">

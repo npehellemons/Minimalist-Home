@@ -1,7 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { get } from "svelte/store";
-  import { activeProfileId, appSettings } from "#lib/app-settings.js";
+  import {
+    activeProfileId,
+    appSettings,
+    type HouseholdProfile,
+  } from "#lib/app-settings.js";
   import { translations } from "#lib/i18n.js";
   import * as Avatar from "#lib/components/ui/avatar/index.js";
   import { Badge } from "#lib/components/ui/badge/index.js";
@@ -55,6 +59,16 @@
     return chores.filter((chore) => chore.completed).length;
   }
 
+  function choreColumnForProfile(
+    columns: ChoreColumn[],
+    profile: HouseholdProfile,
+  ) {
+    const legacyId = profile.family ? "family" : profile.name.toLowerCase();
+    return columns.find(
+      (column) => column.id === profile.id || column.id === legacyId,
+    );
+  }
+
   const initialNow = new Date();
   const initialSettings = get(appSettings);
   let now = $state(initialNow);
@@ -68,12 +82,14 @@
   let selectedBlock = $derived(
     dayBlocks.find((block) => block.id === selectedBlockId) ?? dayBlocks[0],
   );
+  let selectedProfileIsFamily = $derived(
+    $appSettings.profiles.find((profile) => profile.id === $activeProfileId)
+      ?.family === true,
+  );
   let visibleProfiles = $derived(
-    $activeProfileId === "family"
+    selectedProfileIsFamily
       ? $appSettings.profiles
-      : $appSettings.profiles.filter(
-          (profile) => profile.id === $activeProfileId,
-        ),
+      : $appSettings.profiles.filter((profile) => profile.id === $activeProfileId),
   );
   let profileCardBasis = $derived(
     visibleProfiles.length <= 1
@@ -253,7 +269,7 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col bg-background">
-  <div class="flex h-20 shrink-0 items-center justify-between border-b px-6">
+  <div class="flex shrink-0 flex-col gap-3 border-b p-3 md:h-20 md:flex-row md:items-center md:justify-between md:px-6 md:py-0">
     <div class="grid gap-1">
       <p class="text-sm font-medium text-muted-foreground">
         {#if selectedBlock.id === activeBlockId}{text.tasks.now} ·
@@ -262,22 +278,24 @@
       <h2 class="text-2xl font-semibold">{text.tasks[selectedBlock.id]}</h2>
     </div>
 
-    <div class="flex items-center gap-3">
-      <div class="flex items-center gap-1.5">
-        {#each visibleProfiles as profile (profile.id)}
-          <Badge variant="outline" class="gap-1.5 font-normal">
-            <span
-              class="size-2.5 rounded-full"
-              style={`background-color: ${profile.color}`}
-              aria-hidden="true"
-            ></span>
-            {profile.name}
-          </Badge>
-        {/each}
-      </div>
+    <div class="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between md:w-auto md:justify-end md:gap-3">
+      <ScrollArea.Root orientation="horizontal" class="min-w-0">
+        <div class="flex w-max items-center gap-1.5 pr-2">
+          {#each visibleProfiles as profile (profile.id)}
+            <Badge variant="outline" class="gap-1.5 font-normal">
+              <span
+                class="size-2.5 rounded-full"
+                style={`background-color: ${profile.color}`}
+                aria-hidden="true"
+              ></span>
+              {profile.name}
+            </Badge>
+          {/each}
+        </div>
+      </ScrollArea.Root>
 
       <div
-        class="flex h-10 items-center rounded-lg bg-muted/30 p-1"
+        class="grid h-10 shrink-0 grid-cols-3 items-center rounded-lg bg-muted/30 p-1"
         role="group"
         aria-label={text.tasks.block}
       >
@@ -299,14 +317,15 @@
   <ScrollArea.Root orientation="horizontal" class="min-h-0 flex-1 bg-muted/30">
     <div class="flex h-full min-w-full gap-4 p-4">
       {#each visibleProfiles as profile (profile.id)}
-        {@const column = choresByBlock[selectedBlockId].find(
-          (item) => item.id === profile.id,
+        {@const column = choreColumnForProfile(
+          choresByBlock[selectedBlockId],
+          profile,
         )}
         {@const chores = column?.chores ?? []}
         {@const completed = completedCount(chores)}
         <Card.Root
-          class="h-full min-h-0 min-w-0 shrink-0 gap-0 rounded-lg py-0"
-          style={`flex-basis: ${profileCardBasis}`}
+          class="h-full min-h-0 min-w-0 shrink-0 basis-[calc(100vw-2rem)] gap-0 rounded-lg py-0 md:basis-[var(--profile-card-basis)]"
+          style={`--profile-card-basis: ${profileCardBasis}`}
           size="sm"
           role="region"
           aria-label={`${text.tasks.for} ${profile.name}`}

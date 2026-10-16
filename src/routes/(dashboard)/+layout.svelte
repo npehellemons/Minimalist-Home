@@ -16,6 +16,7 @@
     startHouseholdSession,
   } from "#lib/household-session.js";
   import { translations } from "#lib/i18n.js";
+  import { IsMobile } from "#lib/hooks/is-mobile.svelte.js";
   import { provideWeatherStore } from "#lib/weather-store.js";
   import * as Avatar from "#lib/components/ui/avatar/index.js";
   import { Button } from "#lib/components/ui/button/index.js";
@@ -31,6 +32,7 @@
   let activeTab = $state("home");
   let screensaverActive = $state(false);
   let text = $derived(translations[$appSettings.language]);
+  const isMobile = new IsMobile();
   provideWeatherStore();
 
   onMount(() => startHouseholdSession());
@@ -86,11 +88,11 @@
       >
         <Tabs.Root
           bind:value={activeTab}
-          orientation="vertical"
+          orientation={isMobile.current ? "horizontal" : "vertical"}
           activationMode="automatic"
-          class="h-full w-full flex-row gap-0"
+          class="relative h-full w-full flex-row gap-0"
         >
-          <Sidebar.Root collapsible="none" class="border-r">
+          <Sidebar.Root collapsible="none" class="hidden border-r md:flex">
             <Sidebar.Header class="h-24 items-center justify-center">
               <Tooltip.Root>
                 <Tooltip.Trigger>
@@ -151,9 +153,36 @@
             </Sidebar.Content>
           </Sidebar.Root>
 
-          <Sidebar.Inset class="min-h-0 min-w-0 overflow-hidden">
+          <Sidebar.Inset class="min-h-0 min-w-0 overflow-hidden pb-16 md:pb-0">
             {@render children()}
           </Sidebar.Inset>
+
+          <Tabs.List
+            variant="line"
+            class="absolute inset-x-0 bottom-0 z-20 grid h-16 w-full grid-cols-5 rounded-none border-t bg-background/95 p-0 backdrop-blur group-data-horizontal/tabs:h-16 md:hidden"
+            aria-label="Dashboard sections"
+          >
+            <Tabs.Trigger class="h-full flex-col gap-1 rounded-none text-[0.6875rem]" value="home">
+              <House class="size-5" aria-hidden="true" />
+              {text.nav.home}
+            </Tabs.Trigger>
+            <Tabs.Trigger class="h-full flex-col gap-1 rounded-none text-[0.6875rem]" value="calendar">
+              <CalendarDays class="size-5" aria-hidden="true" />
+              {text.nav.calendar}
+            </Tabs.Trigger>
+            <Tabs.Trigger class="h-full flex-col gap-1 rounded-none text-[0.6875rem]" value="tasks">
+              <ListChecks class="size-5" aria-hidden="true" />
+              {text.nav.tasks}
+            </Tabs.Trigger>
+            <Tabs.Trigger class="h-full flex-col gap-1 rounded-none text-[0.6875rem]" value="notes">
+              <NotebookTabs class="size-5" aria-hidden="true" />
+              {text.nav.notes}
+            </Tabs.Trigger>
+            <Tabs.Trigger class="h-full flex-col gap-1 rounded-none text-[0.6875rem]" value="settings">
+              <Settings class="size-5" aria-hidden="true" />
+              {text.nav.settings}
+            </Tabs.Trigger>
+          </Tabs.List>
         </Tabs.Root>
       </Sidebar.Provider>
     </div>
