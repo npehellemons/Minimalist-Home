@@ -195,7 +195,7 @@
       <Card.Content class="gap-4">
         {#each $appSettings.profiles as profile (profile.id)}
           <section class="grid gap-4 border-b pb-5 last:border-b-0">
-            <div class="flex items-center gap-3 flex-col sm:flex-row">
+            <div class="flex gap-3 flex-col sm:flex-row sm:items-center">
               <Avatar.Root size="lg">
                 <Avatar.Fallback
                   style={`background-color: ${profile.color}; color: white`}
