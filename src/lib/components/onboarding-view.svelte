@@ -138,9 +138,16 @@
   }
 </script>
 
-<main class="flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-muted/30 p-4 sm:p-8">
-  <div class="grid max-h-full min-h-0 w-full max-w-5xl gap-6 lg:grid-cols-[minmax(0,0.8fr)_minmax(26rem,1.2fr)]">
-    <section class="hidden flex-col justify-between p-8 lg:flex" aria-label={text.product}>
+<main
+  class="flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-muted/30 p-4 sm:p-8"
+>
+  <div
+    class="grid max-h-full min-h-0 w-full max-w-5xl gap-6 lg:grid-cols-[minmax(0,0.8fr)_minmax(26rem,1.2fr)]"
+  >
+    <section
+      class="hidden flex-col justify-between p-8 lg:flex"
+      aria-label={text.product}
+    >
       <div class="grid gap-6">
         <div class="flex items-center gap-3">
           <Button size="icon-lg" aria-label={text.product}>
@@ -150,7 +157,9 @@
         </div>
         <div class="grid gap-3">
           <h1 class="text-4xl font-semibold">{text.welcome}</h1>
-          <p class="max-w-md text-lg text-muted-foreground">{text.welcomeDescription}</p>
+          <p class="max-w-md text-lg text-muted-foreground">
+            {text.welcomeDescription}
+          </p>
         </div>
       </div>
 
@@ -177,7 +186,9 @@
             <Card.Title>{text.product}</Card.Title>
           </div>
           <Badge variant="secondary" class="ml-auto">
-            {$householdSession.status === "needs-household" ? `2/3 · ${text.stepHousehold}` : `1/3 · ${text.stepAccount}`}
+            {$householdSession.status === "needs-household"
+              ? `2/3 · ${text.stepHousehold}`
+              : `1/3 · ${text.stepAccount}`}
           </Badge>
         </div>
         <Progress value={progress} aria-label={`${progress}%`} />
@@ -185,7 +196,9 @@
 
       <Card.Content class="min-h-0 flex-1 overflow-y-auto p-5 sm:p-8">
         {#if $householdSession.status === "loading"}
-          <div class="flex min-h-72 flex-col items-center justify-center gap-3 text-muted-foreground">
+          <div
+            class="flex min-h-72 flex-col items-center justify-center gap-3 text-muted-foreground"
+          >
             <LoaderCircle class="size-8 animate-spin" aria-hidden="true" />
             <p>{text.loading}</p>
           </div>
@@ -195,25 +208,36 @@
               <Alert.Title>{text.error}</Alert.Title>
               <Alert.Description>{$householdSession.error}</Alert.Description>
             </Alert.Root>
-            <Button onclick={() => void refreshHouseholdSession()}>{text.retry}</Button>
+            <Button onclick={() => void refreshHouseholdSession()}
+              >{text.retry}</Button
+            >
           </div>
         {:else if confirmationEmail}
           <div class="grid min-h-72 place-items-center gap-5 text-center">
             <div class="grid justify-items-center gap-4">
-              <Button size="icon-lg" variant="secondary" aria-label={text.confirmTitle}>
+              <Button
+                size="icon-lg"
+                variant="secondary"
+                aria-label={text.confirmTitle}
+              >
                 <MailCheck aria-hidden="true" />
               </Button>
               <div class="grid gap-2">
                 <h2 class="text-2xl font-semibold">{text.confirmTitle}</h2>
                 <p class="text-muted-foreground">
-                  {text.confirmDescription}<br /><strong class="text-foreground">{confirmationEmail}</strong>
+                  {text.confirmDescription}<br /><strong class="text-foreground"
+                    >{confirmationEmail}</strong
+                  >
                 </p>
               </div>
             </div>
-            <Button variant="outline" onclick={() => {
-              confirmationEmail = "";
-              authMode = "signin";
-            }}>{text.backToSignIn}</Button>
+            <Button
+              variant="outline"
+              onclick={() => {
+                confirmationEmail = "";
+                authMode = "signin";
+              }}>{text.backToSignIn}</Button
+            >
           </div>
         {:else if $householdSession.status === "signed-out"}
           <div class="grid gap-6">
@@ -232,14 +256,31 @@
             <form class="grid gap-5" onsubmit={submitAuth}>
               <div class="grid gap-2">
                 <Label for="onboarding-email">{text.email}</Label>
-                <Input id="onboarding-email" type="email" autocomplete="email" bind:value={email} required />
+                <Input
+                  id="onboarding-email"
+                  type="email"
+                  autocomplete="email"
+                  bind:value={email}
+                  required
+                />
               </div>
               <div class="grid gap-2">
                 <div class="flex items-center justify-between gap-3">
                   <Label for="onboarding-password">{text.password}</Label>
-                  <span class="text-xs text-muted-foreground">{text.passwordHint}</span>
+                  <span class="text-xs text-muted-foreground"
+                    >{text.passwordHint}</span
+                  >
                 </div>
-                <Input id="onboarding-password" type="password" autocomplete={authMode === "signup" ? "new-password" : "current-password"} minlength={8} bind:value={password} required />
+                <Input
+                  id="onboarding-password"
+                  type="password"
+                  autocomplete={authMode === "signup"
+                    ? "new-password"
+                    : "current-password"}
+                  minlength={8}
+                  bind:value={password}
+                  required
+                />
               </div>
 
               {#if errorMessage}
@@ -250,16 +291,23 @@
               {/if}
 
               <Button type="submit" size="lg" disabled={submitting}>
-                {#if submitting}<LoaderCircle class="animate-spin" aria-hidden="true" />{/if}
+                {#if submitting}<LoaderCircle
+                    class="animate-spin"
+                    aria-hidden="true"
+                  />{/if}
                 {submitting
-                  ? authMode === "signup" ? text.creatingAccount : text.signingIn
-                  : authMode === "signup" ? text.createAccount : text.signIn}
+                  ? authMode === "signup"
+                    ? text.creatingAccount
+                    : text.signingIn
+                  : authMode === "signup"
+                    ? text.createAccount
+                    : text.signIn}
                 {#if !submitting}<ArrowRight aria-hidden="true" />{/if}
               </Button>
             </form>
 
             <Separator />
-            <p class="flex items-center justify-center gap-2 text-center text-xs text-muted-foreground">
+            <p class="flex justify-center gap-2 text-xs text-muted-foreground">
               <LockKeyhole class="size-3.5" aria-hidden="true" />
               {text.secure}
             </p>
@@ -268,17 +316,28 @@
           <form class="grid gap-6" onsubmit={finishHousehold}>
             <div class="grid gap-2">
               <h1 class="text-2xl font-semibold">{text.householdTitle}</h1>
-              <p class="text-sm text-muted-foreground">{text.householdDescription}</p>
+              <p class="text-sm text-muted-foreground">
+                {text.householdDescription}
+              </p>
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
               <div class="grid gap-2">
                 <Label for="household-name">{text.householdName}</Label>
-                <Input id="household-name" bind:value={householdName} maxlength={80} required />
+                <Input
+                  id="household-name"
+                  bind:value={householdName}
+                  maxlength={80}
+                  required
+                />
               </div>
               <div class="grid gap-2">
                 <Label for="household-location">{text.location}</Label>
-                <Input id="household-location" bind:value={locationName} required />
+                <Input
+                  id="household-location"
+                  bind:value={locationName}
+                  required
+                />
               </div>
             </div>
 
@@ -297,9 +356,13 @@
                 <div class="flex items-start justify-between gap-4">
                   <div class="grid gap-1">
                     <Card.Title>{text.importTitle}</Card.Title>
-                    <Card.Description>{text.importDescription}</Card.Description>
+                    <Card.Description>{text.importDescription}</Card.Description
+                    >
                   </div>
-                  <Switch bind:checked={importExisting} aria-label={text.importTitle} />
+                  <Switch
+                    bind:checked={importExisting}
+                    aria-label={text.importTitle}
+                  />
                 </div>
               </Card.Header>
               {#if importExisting}
@@ -307,13 +370,19 @@
                   <div class="flex flex-wrap items-center gap-2">
                     {#each sourceSettings.profiles as profile (profile.id)}
                       <Avatar.Root size="sm">
-                        <Avatar.Fallback style={`background-color: ${profile.color}; color: white`}>
+                        <Avatar.Fallback
+                          style={`background-color: ${profile.color}; color: white`}
+                        >
                           {profile.avatar}
                         </Avatar.Fallback>
                       </Avatar.Root>
                     {/each}
-                    <Badge variant="outline">{profileCount} {text.profiles}</Badge>
-                    <Badge variant="outline">{calendarCount} {text.calendars}</Badge>
+                    <Badge variant="outline"
+                      >{profileCount} {text.profiles}</Badge
+                    >
+                    <Badge variant="outline"
+                      >{calendarCount} {text.calendars}</Badge
+                    >
                   </div>
                 </Card.Content>
               {/if}
@@ -326,10 +395,23 @@
               </Alert.Root>
             {/if}
 
-            <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
-              <Button type="button" variant="ghost" onclick={() => void signOut()}>{text.signOut}</Button>
-              <Button type="submit" size="lg" disabled={submitting || !householdName.trim()}>
-                {#if submitting}<LoaderCircle class="animate-spin" aria-hidden="true" />{/if}
+            <div
+              class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between"
+            >
+              <Button
+                type="button"
+                variant="ghost"
+                onclick={() => void signOut()}>{text.signOut}</Button
+              >
+              <Button
+                type="submit"
+                size="lg"
+                disabled={submitting || !householdName.trim()}
+              >
+                {#if submitting}<LoaderCircle
+                    class="animate-spin"
+                    aria-hidden="true"
+                  />{/if}
                 {submitting ? text.finishing : text.finish}
                 {#if !submitting}<ArrowRight aria-hidden="true" />{/if}
               </Button>
