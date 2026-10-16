@@ -1,0 +1,1 @@
+-- Development seed data will be added once household onboarding is wired up.
