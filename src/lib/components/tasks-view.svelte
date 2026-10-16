@@ -7,7 +7,7 @@
     type HouseholdProfile,
   } from "#lib/app-settings.js";
   import { translations } from "#lib/i18n.js";
-  import * as Avatar from "#lib/components/ui/avatar/index.js";
+  import ProfileAvatar from "#lib/components/profile-avatar.svelte";
   import { Badge } from "#lib/components/ui/badge/index.js";
   import { Button } from "#lib/components/ui/button/index.js";
   import * as Card from "#lib/components/ui/card/index.js";
@@ -268,7 +268,7 @@
   });
 </script>
 
-<div class="flex h-full min-h-0 flex-col bg-background">
+<div class="flex h-full min-h-0 min-w-0 w-full flex-col overflow-hidden bg-background">
   <div class="flex shrink-0 flex-col gap-3 border-b p-3 md:h-20 md:flex-row md:items-center md:justify-between md:px-6 md:py-0">
     <div class="grid gap-1">
       <p class="text-sm font-medium text-muted-foreground">
@@ -314,7 +314,11 @@
     </div>
   </div>
 
-  <ScrollArea.Root orientation="horizontal" class="min-h-0 flex-1 bg-muted/30">
+  <ScrollArea.Root
+    orientation="horizontal"
+    viewportClass="snap-x snap-mandatory scroll-smooth"
+    class="min-h-0 min-w-0 w-full flex-1 bg-muted/30"
+  >
     <div class="flex h-full min-w-full gap-4 p-4">
       {#each visibleProfiles as profile (profile.id)}
         {@const column = choreColumnForProfile(
@@ -324,7 +328,7 @@
         {@const chores = column?.chores ?? []}
         {@const completed = completedCount(chores)}
         <Card.Root
-          class="h-full min-h-0 min-w-0 shrink-0 basis-[calc(100vw-2rem)] gap-0 rounded-lg py-0 md:basis-[var(--profile-card-basis)]"
+          class="h-full min-h-0 min-w-0 shrink-0 snap-start basis-[calc(100vw-2rem)] gap-0 rounded-lg py-0 md:snap-none md:basis-[var(--profile-card-basis)]"
           style={`--profile-card-basis: ${profileCardBasis}`}
           size="sm"
           role="region"
@@ -334,13 +338,7 @@
             class="flex min-h-16 shrink-0 flex-row items-center justify-between border-b px-4 pt-(--card-spacing)"
           >
             <div class="flex min-w-0 items-center gap-3">
-              <Avatar.Root>
-                <Avatar.Fallback
-                  style={`background-color: ${profile.color}; color: white`}
-                >
-                  {profile.avatar}
-                </Avatar.Fallback>
-              </Avatar.Root>
+              <ProfileAvatar name={profile.name} />
               <Card.Title class="truncate">{profile.name}</Card.Title>
             </div>
             <Badge

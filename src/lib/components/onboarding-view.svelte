@@ -20,8 +20,8 @@
     signUp,
   } from "#lib/household-session.js";
   import { translations } from "#lib/i18n.js";
+  import ProfileAvatar from "#lib/components/profile-avatar.svelte";
   import * as Alert from "#lib/components/ui/alert/index.js";
-  import * as Avatar from "#lib/components/ui/avatar/index.js";
   import { Badge } from "#lib/components/ui/badge/index.js";
   import { Button } from "#lib/components/ui/button/index.js";
   import * as Card from "#lib/components/ui/card/index.js";
@@ -369,13 +369,7 @@
                 <Card.Content class="gap-3">
                   <div class="flex flex-wrap items-center gap-2">
                     {#each sourceSettings.profiles as profile (profile.id)}
-                      <Avatar.Root size="sm">
-                        <Avatar.Fallback
-                          style={`background-color: ${profile.color}; color: white`}
-                        >
-                          {profile.avatar}
-                        </Avatar.Fallback>
-                      </Avatar.Root>
+                      <ProfileAvatar name={profile.name} size="sm" />
                     {/each}
                     <Badge variant="outline"
                       >{profileCount} {text.profiles}</Badge

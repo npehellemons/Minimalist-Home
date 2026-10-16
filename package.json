@@ -20,10 +20,12 @@
     "test:onboarding": "node scripts/test-household-onboarding.mjs"
   },
   "dependencies": {
+    "@blobatar/svelte": "^2.7.0",
     "@fullcalendar/icalendar": "^7.1.2",
     "@lucide/svelte": "^1.57.0",
     "@supabase/supabase-js": "^2.118.0",
     "bits-ui": "^2.19.5",
+    "blobatar": "^2.7.0",
     "fullcalendar": "^7.1.2",
     "ical.js": "^2.2.1",
     "mode-watcher": "^1.1.0",

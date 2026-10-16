@@ -27,19 +27,19 @@
     updateProfile as updateHouseholdProfile,
   } from "#lib/household-session.js";
   import { translations } from "#lib/i18n.js";
-  import * as Avatar from "#lib/components/ui/avatar/index.js";
+  import ProfileAvatar from "#lib/components/profile-avatar.svelte";
   import { Badge } from "#lib/components/ui/badge/index.js";
   import { Button } from "#lib/components/ui/button/index.js";
   import * as Card from "#lib/components/ui/card/index.js";
   import { Input } from "#lib/components/ui/input/index.js";
   import { Label } from "#lib/components/ui/label/index.js";
   import * as ScrollArea from "#lib/components/ui/scroll-area/index.js";
+  import { Separator } from "#lib/components/ui/separator/index.js";
   import { Switch } from "#lib/components/ui/switch/index.js";
 
   let calendarNames = $state<Record<string, string>>({});
   let calendarUrls = $state<Record<string, string>>({});
   let profileName = $state("");
-  let profileAvatar = $state("");
   let profileColor = $state("#2563eb");
   let locationQuery = $state("");
   let locationStatus = $state<"idle" | "loading" | "saved" | "error">("idle");
@@ -101,14 +101,13 @@
     const saved = await persist(() =>
       createHouseholdProfile({
         name,
-        avatar: profileAvatar.trim() || name.slice(0, 1).toUpperCase(),
+        avatar: name.slice(0, 1).toUpperCase(),
         color: profileColor,
       }),
     );
     if (!saved) return;
 
     profileName = "";
-    profileAvatar = "";
     profileColor = "#2563eb";
   }
 
@@ -192,82 +191,57 @@
         </div>
         <Card.Description>{text.settings.profilesDescription}</Card.Description>
       </Card.Header>
-      <Card.Content class="gap-4">
-        {#each $appSettings.profiles as profile (profile.id)}
-          <section class="grid gap-4 border-b pb-5 last:border-b-0">
-            <div class="flex gap-3 flex-col sm:flex-row sm:items-center">
-              <Avatar.Root size="lg">
-                <Avatar.Fallback
-                  style={`background-color: ${profile.color}; color: white`}
+      <Card.Content class="gap-0 px-0">
+        {#each $appSettings.profiles as profile, index (profile.id)}
+          {#if index > 0}
+            <Separator />
+          {/if}
+          <section class="grid gap-5 px-4 py-5 sm:px-6">
+            <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto] sm:items-end">
+              <ProfileAvatar name={profile.name} size="lg" class="col-start-1 row-start-1 self-center" />
+              <p class="col-start-2 row-start-1 truncate font-medium sm:hidden">{profile.name}</p>
+              <div class="col-span-3 row-start-2 grid min-w-0 gap-2 sm:col-span-1 sm:col-start-2 sm:row-start-1">
+                <Label for={`${profile.id}-name`}>{text.settings.profileName}</Label>
+                <Input
+                  id={`${profile.id}-name`}
+                  value={profile.name}
+                  onchange={(event) =>
+                    updateProfile(profile.id, {
+                      name: event.currentTarget.value,
+                    })}
+                />
+              </div>
+              <div class="col-span-3 row-start-3 grid gap-2 sm:col-span-1 sm:col-start-3 sm:row-start-1">
+                <Label for={`${profile.id}-color`}>{text.settings.profileColor}</Label>
+                <input
+                  id={`${profile.id}-color`}
+                  class="h-9 w-full min-w-16 cursor-pointer rounded-md border bg-background p-1 sm:w-16"
+                  type="color"
+                  value={profile.color}
+                  onchange={(event) =>
+                    updateProfile(profile.id, {
+                      color: event.currentTarget.value,
+                    })}
+                />
+              </div>
+              {#if profile.family}
+                <Badge variant="secondary" class="col-start-3 row-start-1 h-9 self-center px-3 sm:col-start-4 sm:self-end">
+                  {profile.name}
+                </Badge>
+              {:else}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="col-start-3 row-start-1 self-center sm:col-start-4 sm:self-end"
+                  aria-label={text.settings.removeProfile}
+                  onclick={() => removeProfile(profile.id)}
                 >
-                  {profile.avatar}
-                </Avatar.Fallback>
-              </Avatar.Root>
-              <div
-                class="grid min-w-0 flex-1 gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_auto] sm:items-end"
-              >
-                <div class="grid gap-2">
-                  <Label for={`${profile.id}-name`}
-                    >{text.settings.profileName}</Label
-                  >
-                  <Input
-                    id={`${profile.id}-name`}
-                    value={profile.name}
-                    onchange={(event) =>
-                      updateProfile(profile.id, {
-                        name: event.currentTarget.value,
-                      })}
-                  />
-                </div>
-                <div class="grid gap-2">
-                  <Label for={`${profile.id}-avatar`}
-                    >{text.settings.profileAvatar}</Label
-                  >
-                  <Input
-                    id={`${profile.id}-avatar`}
-                    maxlength={2}
-                    value={profile.avatar}
-                    onchange={(event) =>
-                      updateProfile(profile.id, {
-                        avatar: event.currentTarget.value,
-                      })}
-                  />
-                </div>
-                <div class="grid gap-2">
-                  <Label for={`${profile.id}-color`}
-                    >{text.settings.profileColor}</Label
-                  >
-                  <input
-                    id={`${profile.id}-color`}
-                    class="h-9 w-12 cursor-pointer rounded-md border bg-background p-1"
-                    type="color"
-                    value={profile.color}
-                    onchange={(event) =>
-                      updateProfile(profile.id, {
-                        color: event.currentTarget.value,
-                      })}
-                  />
-                </div>
-              </div>
-              <div class="shrink-0">
-                {#if profile.family}
-                  <Button variant="ghost" size="icon" disabled={profile.family}>
-                    <Trash2 aria-hidden="true" />
-                  </Button>
-                {:else}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={text.settings.removeProfile}
-                    onclick={() => removeProfile(profile.id)}
-                  >
-                    <Trash2 aria-hidden="true" />
-                  </Button>
-                {/if}
-              </div>
+                  <Trash2 aria-hidden="true" />
+                </Button>
+              {/if}
             </div>
 
-            <div class="grid gap-3 rounded-md border bg-muted/30 p-3">
+            <div class="grid gap-4 sm:pl-16">
               <div class="flex flex-wrap items-center gap-2">
                 <CalendarDays class="size-4" aria-hidden="true" />
                 <h3 class="text-sm font-medium">{text.settings.calendars}</h3>
@@ -280,9 +254,7 @@
               </div>
 
               {#each profile.calendars as calendar (calendar.id)}
-                <div
-                  class="grid grid-cols-[1fr_auto] items-end gap-3 sm:grid-cols-[1fr_2fr_auto_auto]"
-                >
+                <div class="grid items-end gap-3 rounded-md bg-muted/40 p-3 sm:grid-cols-[1fr_2fr_auto_auto]">
                   <div class="col-span-2 grid gap-2 sm:col-span-1">
                     <Label for={`${profile.id}-${calendar.id}-name`}>
                       {text.settings.calendarName}
@@ -310,7 +282,7 @@
                     />
                   </div>
                   <div class="grid justify-items-center gap-2">
-                    <Label for={`${profile.id}-${calendar.id}-enabled`}>
+                    <Label class="sr-only" for={`${profile.id}-${calendar.id}-enabled`}>
                       {text.settings.enabled}
                     </Label>
                     <Switch
@@ -369,38 +341,33 @@
           </section>
         {/each}
 
+      </Card.Content>
+      <Card.Footer class="border-t bg-muted/20">
         <form
-          class="grid gap-3 sm:grid-cols-[1fr_7rem_auto_auto] sm:items-end"
+          class="grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-3 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto] sm:items-end"
           onsubmit={addProfile}
         >
-          <div class="grid gap-2">
+          <ProfileAvatar name={profileName || text.settings.addProfile} size="lg" class="col-start-1 row-start-1 self-center" />
+          <p class="col-start-2 row-start-1 font-medium sm:hidden">{text.settings.addProfile}</p>
+          <div class="col-span-2 row-start-2 grid gap-2 sm:col-span-1 sm:col-start-2 sm:row-start-1">
             <Label for="new-profile-name">{text.settings.profileName}</Label>
             <Input id="new-profile-name" bind:value={profileName} required />
           </div>
-          <div class="grid gap-2">
-            <Label for="new-profile-avatar">{text.settings.profileAvatar}</Label
-            >
-            <Input
-              id="new-profile-avatar"
-              maxlength={2}
-              bind:value={profileAvatar}
-            />
-          </div>
-          <div class="grid gap-2">
+          <div class="col-span-2 row-start-3 grid gap-2 sm:col-span-1 sm:col-start-3 sm:row-start-1">
             <Label for="new-profile-color">{text.settings.profileColor}</Label>
             <input
               id="new-profile-color"
-              class="h-9 w-12 cursor-pointer rounded-md border bg-background p-1"
+              class="h-9 w-full min-w-16 cursor-pointer rounded-md border bg-background p-1 sm:w-16"
               type="color"
               bind:value={profileColor}
             />
           </div>
-          <Button type="submit" class="w-full sm:w-auto">
+          <Button type="submit" class="col-span-2 row-start-4 w-full sm:col-span-1 sm:col-start-4 sm:row-start-1 sm:w-auto">
             <Plus aria-hidden="true" />
             {text.settings.addProfile}
           </Button>
         </form>
-      </Card.Content>
+      </Card.Footer>
     </Card.Root>
 
     <div class="grid gap-4 lg:grid-cols-2">

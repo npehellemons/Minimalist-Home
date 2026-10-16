@@ -67,6 +67,7 @@
               <House aria-hidden="true" />
             </Avatar.Fallback>
           </Avatar.Root>
+          <Card.Title>{text.onboarding.product}</Card.Title>
           <div class="grid justify-items-center gap-2">
             <LoaderCircle class="size-6 animate-spin text-muted-foreground" aria-hidden="true" />
             <p class="font-medium">{text.onboarding.loading}</p>

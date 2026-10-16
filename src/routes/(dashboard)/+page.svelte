@@ -20,7 +20,7 @@
   import TasksView from "#lib/components/tasks-view.svelte";
   import { appLocale, translations } from "#lib/i18n.js";
   import { householdSession } from "#lib/household-session.js";
-  import * as Avatar from "#lib/components/ui/avatar/index.js";
+  import ProfileAvatar from "#lib/components/profile-avatar.svelte";
   import { Button } from "#lib/components/ui/button/index.js";
   import * as ScrollArea from "#lib/components/ui/scroll-area/index.js";
   import { Separator } from "#lib/components/ui/separator/index.js";
@@ -123,16 +123,10 @@
                 aria-pressed={$activeProfileId === profile.id}
                 onclick={() => activeProfileId.set(profile.id)}
               >
-                <Avatar.Root>
-                  <Avatar.Fallback
-                    style={`background-color: ${profile.color}; color: white`}
-                  >
-                    {profile.avatar}
-                  </Avatar.Fallback>
-                  {#if $activeProfileId === profile.id}
-                    <Avatar.Badge />
-                  {/if}
-                </Avatar.Root>
+                <ProfileAvatar
+                  name={profile.name}
+                  active={$activeProfileId === profile.id}
+                />
               </Button>
             {/each}
           </div>
