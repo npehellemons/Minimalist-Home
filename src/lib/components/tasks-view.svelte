@@ -445,14 +445,14 @@
   <ScrollArea.Root
     orientation="horizontal"
     viewportClass="snap-x snap-mandatory scroll-smooth"
-    class="min-h-0 min-w-0 w-full flex-1 bg-muted/30"
+    class="min-h-0 min-w-0 w-full flex-1 bg-muted/30 [container-type:inline-size]"
   >
     <div class="flex h-full min-w-full md:gap-4 md:p-4">
       {#each visibleProfiles as profile (profile.id)}
         {@const profileTasks = tasksForProfile(profile)}
         {@const completed = completedCount(profileTasks)}
         <div
-          class="h-full w-full min-w-0 shrink-0 snap-center p-4 md:w-auto md:snap-none md:basis-[var(--profile-card-basis)] md:p-0"
+          class="h-full w-[100cqw] max-w-[100cqw] basis-[100cqw] shrink-0 snap-center p-4 md:w-auto md:max-w-none md:snap-none md:basis-[var(--profile-card-basis)] md:p-0"
           style={`--profile-card-basis: ${profileCardBasis}`}
         >
           <Card.Root
