@@ -11,6 +11,8 @@ type TaskRow = Tables<"tasks">;
 type TaskAssignmentRow = Tables<"task_assignments">;
 type TaskCompletionRow = Tables<"task_completions">;
 
+let taskSubscriptionSequence = 0;
+
 export type DailyTask = {
   id: string;
   profileId: string;
@@ -261,7 +263,10 @@ export async function deleteTask(householdId: string, taskId: string) {
 
 export function subscribeToTasks(householdId: string, onChange: () => void) {
   const client = requireSupabase();
-  const channel: RealtimeChannel = client.channel(`household-tasks:${householdId}`);
+  const subscriptionId = ++taskSubscriptionSequence;
+  const channel: RealtimeChannel = client.channel(
+    `household-tasks:${householdId}:${subscriptionId}`,
+  );
 
   for (const table of ["tasks", "task_assignments", "task_completions"] as const) {
     channel.on(
