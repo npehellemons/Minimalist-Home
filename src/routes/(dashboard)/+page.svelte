@@ -230,9 +230,6 @@
 <Tabs.Content class="h-full p-0" value="tasks">
   {@render dashboardPage("Tasks", "Tasks content", true, tasksContent)}
 </Tabs.Content>
-<Tabs.Content class="h-full p-0" value="notes">
-  {@render dashboardPage("Notes", "Notes content")}
-</Tabs.Content>
 <Tabs.Content class="h-full p-0" value="settings">
   {@render dashboardPage("Settings", "Settings content", true, settingsContent)}
 </Tabs.Content>

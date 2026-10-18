@@ -34,6 +34,7 @@
   } from "#lib/household-session.js";
   import { appLocale, translations } from "#lib/i18n.js";
   import ProfileAvatar from "#lib/components/profile-avatar.svelte";
+  import PhotoLibrarySettings from "#lib/components/photo-library-settings.svelte";
   import { Badge } from "#lib/components/ui/badge/index.js";
   import { Button } from "#lib/components/ui/button/index.js";
   import * as Card from "#lib/components/ui/card/index.js";
@@ -350,6 +351,10 @@
         {/if}
       </Card.Content>
     </Card.Root>
+
+    {#if canManageHousehold}
+      <PhotoLibrarySettings />
+    {/if}
 
     {#if canManageHousehold}
       <Card.Root size="sm">

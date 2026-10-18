@@ -135,6 +135,48 @@ export type Database = {
         };
         Relationships: [];
       };
+      household_photos: {
+        Row: {
+          created_at: string;
+          created_by: string;
+          household_id: string;
+          id: string;
+          mime_type: string;
+          original_name: string;
+          sort_order: number;
+          storage_path: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          created_by?: string;
+          household_id: string;
+          id?: string;
+          mime_type: string;
+          original_name: string;
+          sort_order?: number;
+          storage_path: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string;
+          household_id?: string;
+          id?: string;
+          mime_type?: string;
+          original_name?: string;
+          sort_order?: number;
+          storage_path?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "household_photos_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           avatar: string;

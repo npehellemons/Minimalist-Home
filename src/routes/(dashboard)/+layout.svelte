@@ -4,12 +4,13 @@
     House,
     ListChecks,
     LoaderCircle,
+    Images,
     MonitorPlay,
-    NotebookTabs,
     Settings,
   } from "@lucide/svelte";
   import { appSettings } from "#lib/app-settings.js";
   import OnboardingView from "#lib/components/onboarding-view.svelte";
+  import PhotoSlideshow from "#lib/components/photo-slideshow.svelte";
   import Screensaver from "#lib/components/screensaver.svelte";
   import {
     householdSession,
@@ -30,6 +31,7 @@
 
   let { children } = $props();
   let activeTab = $state("home");
+  let returnTab = $state("home");
   let screensaverActive = $state(false);
   let text = $derived(translations[$appSettings.language]);
   const isMobile = new IsMobile();
@@ -40,6 +42,10 @@
   $effect(() => {
     const preferredMode = $appSettings.colorMode;
     untrack(() => setMode(preferredMode === "auto" ? "system" : preferredMode));
+  });
+
+  $effect(() => {
+    if (activeTab !== "photos") returnTab = activeTab;
   });
 
   function enterScreensaver() {
@@ -54,6 +60,21 @@
 
   function exitScreensaver() {
     screensaverActive = false;
+  }
+
+  function enterPhotos() {
+    if (!document.fullscreenElement) {
+      void document.documentElement.requestFullscreen().catch(() => {
+        // Fullscreen may be unavailable outside a direct user interaction.
+      });
+    }
+
+    activeTab = "photos";
+  }
+
+  function exitPhotos() {
+    activeTab = returnTab;
+    if (document.fullscreenElement) void document.exitFullscreen();
   }
 </script>
 
@@ -80,6 +101,10 @@
   {:else if screensaverActive}
     <div class="absolute inset-0" transition:fade={{ duration: 250 }}>
       <Screensaver onExit={exitScreensaver} />
+    </div>
+  {:else if activeTab === "photos"}
+    <div class="absolute inset-0" transition:fade={{ duration: 250 }}>
+      <PhotoSlideshow onExit={exitPhotos} />
     </div>
   {:else}
     <div class="absolute inset-0" transition:fade={{ duration: 250 }}>
@@ -140,9 +165,10 @@
                 </Tabs.Trigger>
                 <Tabs.Trigger
                   class="h-16 flex-none flex-col items-center justify-center gap-1 group-data-vertical/tabs:justify-center"
-                  value="notes"
+                  value="photos"
+                  onclick={enterPhotos}
                 >
-                  <NotebookTabs class="size-5" aria-hidden="true" />
+                  <Images class="size-5" aria-hidden="true" />
                 </Tabs.Trigger>
                 <Tabs.Trigger
                   class="mt-auto h-16 flex-none flex-col items-center justify-center gap-1 group-data-vertical/tabs:justify-center"
@@ -175,9 +201,13 @@
               <ListChecks class="size-5" aria-hidden="true" />
               {text.nav.tasks}
             </Tabs.Trigger>
-            <Tabs.Trigger class="h-full flex-col gap-1 rounded-none text-[0.6875rem]" value="notes">
-              <NotebookTabs class="size-5" aria-hidden="true" />
-              {text.nav.notes}
+            <Tabs.Trigger
+              class="h-full flex-col gap-1 rounded-none text-[0.6875rem]"
+              value="photos"
+              onclick={enterPhotos}
+            >
+              <Images class="size-5" aria-hidden="true" />
+              {text.nav.photos}
             </Tabs.Trigger>
             <Tabs.Trigger class="h-full flex-col gap-1 rounded-none text-[0.6875rem]" value="settings">
               <Settings class="size-5" aria-hidden="true" />
