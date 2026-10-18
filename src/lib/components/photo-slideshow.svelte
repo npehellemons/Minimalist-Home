@@ -162,32 +162,32 @@
     </div>
   {/if}
 
-  <Card.Root class="absolute bottom-6 left-6 max-w-[calc(100%-3rem)] border-white/20 bg-black/60 py-4 text-white shadow-lg backdrop-blur-md md:bottom-10 md:left-10">
-    <Card.Content class="flex items-end gap-5 px-5 md:gap-7 md:px-7">
-      <div class="grid gap-1">
+  <Card.Root
+    class="absolute bottom-6 left-6 max-w-[calc(100%-3rem)] border-0 bg-black/45 py-0 text-white shadow-2xl backdrop-blur-sm md:bottom-10 md:left-10"
+  >
+    <Card.Content class="grid gap-3 px-5 py-4 md:px-7 md:py-5">
+      <div class="grid gap-0.5">
         <time class="text-sm font-medium capitalize text-white/75" datetime={now.toISOString()}>
           {formattedDate}
         </time>
-        <time class="text-5xl font-semibold leading-none tabular-nums md:text-7xl" datetime={now.toISOString()}>
+        <time class="text-5xl font-semibold leading-none tabular-nums drop-shadow-md md:text-7xl" datetime={now.toISOString()}>
           {formattedTime}
         </time>
       </div>
 
-      <div class="mb-1 flex items-center gap-3 border-l border-white/20 pl-5 md:pl-7">
+      <div class="flex min-h-8 items-center gap-2.5 text-white/90">
         {#if weather}
-          <WeatherIcon kind={weather.kind} isDay={weather.isDay} class="size-8 md:size-10" />
-          <div class="grid gap-0.5">
-            <strong class="text-2xl leading-none md:text-3xl">
-              {Math.round(weather.temperature)}{weather.unit}
-            </strong>
-            <span class="max-w-40 truncate text-xs text-white/70 md:text-sm">
-              {weather.description}
-            </span>
-          </div>
+          <WeatherIcon kind={weather.kind} isDay={weather.isDay} class="size-6 md:size-7" />
+          <strong class="text-lg leading-none md:text-xl">
+            {Math.round(weather.temperature)}{weather.unit}
+          </strong>
+          <span class="max-w-48 truncate text-sm text-white/70">
+            {weather.description}
+          </span>
         {:else}
-          <div class="grid gap-2" aria-label={weatherUnavailable ? text.weather.unavailable : text.weather.loading}>
-            <Skeleton class="h-8 w-20 bg-white/20" />
-            <Skeleton class="h-3 w-28 bg-white/20" />
+          <div class="flex items-center gap-2" aria-label={weatherUnavailable ? text.weather.unavailable : text.weather.loading}>
+            <Skeleton class="size-6 rounded-full bg-white/20" />
+            <Skeleton class="h-5 w-28 bg-white/20" />
           </div>
         {/if}
       </div>
