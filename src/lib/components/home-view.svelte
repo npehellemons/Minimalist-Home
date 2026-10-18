@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CalendarDays, ListChecks, Repeat2 } from "@lucide/svelte";
+  import { CalendarDays, Droplets, ListChecks, Repeat2 } from "@lucide/svelte";
   import { onMount } from "svelte";
   import { get } from "svelte/store";
   import { Temporal } from "temporal-polyfill";
@@ -21,6 +21,7 @@
   import { Checkbox } from "#lib/components/ui/checkbox/index.js";
   import * as ScrollArea from "#lib/components/ui/scroll-area/index.js";
   import { Skeleton } from "#lib/components/ui/skeleton/index.js";
+  import WeatherIcon from "#lib/components/weather-icon.svelte";
   import { householdSession } from "#lib/household-session.js";
   import { appLocale, translations } from "#lib/i18n.js";
   import {
@@ -31,8 +32,12 @@
     type DailyTask,
     type TaskDayPart,
   } from "#lib/tasks.js";
+  import { getWeatherStore } from "#lib/weather-store.js";
 
   let { now }: { now: Date } = $props();
+
+  const VISIBLE_FORECAST_HOURS = 8;
+  const weatherStore = getWeatherStore();
 
   type DayPartWindow = {
     id: TaskDayPart;
@@ -57,6 +62,24 @@
   let calendarLoadGeneration = 0;
 
   let text = $derived(translations[$appSettings.language]);
+  let locale = $derived(appLocale($appSettings.language));
+  let hourlyForecast = $derived($weatherStore.hourly);
+  let forecastUnavailable = $derived($weatherStore.unavailable);
+  let visibleForecast = $derived.by(() => {
+    const currentHour = new Intl.DateTimeFormat(locale, {
+      hour: "2-digit",
+      hourCycle: "h23",
+      timeZone: $appSettings.location.timezone,
+    })
+      .format(now)
+      .padStart(2, "0");
+    const currentIndex = hourlyForecast.findIndex((entry) =>
+      entry.time.endsWith(`T${currentHour}:00`),
+    );
+
+    const start = Math.max(currentIndex, 0);
+    return hourlyForecast.slice(start, start + VISIBLE_FORECAST_HOURS);
+  });
   let todayKey = $derived(
     dateKeyInTimeZone(now, $appSettings.location.timezone),
   );
@@ -285,16 +308,62 @@
   });
 </script>
 
-<div class="h-full min-h-0 bg-muted/30 p-3 md:p-6">
-  <div class="grid h-full min-h-0 gap-3 md:grid-cols-2 md:gap-6">
-    <Card.Root class="min-h-0">
+<div class="flex h-full min-h-0 flex-col gap-3 overflow-hidden bg-muted/30 p-3 md:gap-4 md:p-6">
+  <Card.Root size="sm" class="shrink-0 py-0">
+    <ScrollArea.Root orientation="horizontal" class="w-full" viewportClass="w-full">
+      {#if visibleForecast.length > 0}
+        <div class="grid min-w-[44rem] grid-cols-8 divide-x">
+          {#each visibleForecast as forecast}
+            {@const forecastTime = forecast.time.slice(11, 16)}
+            <div
+              class="flex min-w-0 items-center justify-center gap-2 px-3 py-3"
+              aria-label={`${forecastTime}, ${forecast.description}, ${Math.round(forecast.temperature)} ${text.weather.degrees}, ${forecast.precipitationProbability}% ${text.weather.precipitation}`}
+            >
+              <WeatherIcon
+                kind={forecast.kind}
+                isDay={forecast.isDay}
+                class="size-7 shrink-0"
+              />
+              <div class="grid min-w-0 gap-0.5">
+                <time class="text-xs tabular-nums text-muted-foreground" datetime={forecast.time}>
+                  {forecastTime}
+                </time>
+                <div class="flex items-center gap-2">
+                  <strong class="text-base leading-none tabular-nums">
+                    {Math.round(forecast.temperature)}°
+                  </strong>
+                  <span class="flex items-center gap-0.5 text-xs text-muted-foreground">
+                    <Droplets class="size-3" aria-hidden="true" />
+                    {forecast.precipitationProbability}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          {/each}
+        </div>
+      {:else if forecastUnavailable}
+        <div class="grid h-16 place-items-center px-4 text-sm text-muted-foreground">
+          {text.weather.unavailable}
+        </div>
+      {:else}
+        <div class="grid min-w-[44rem] grid-cols-8 gap-3 p-3" aria-label={text.weather.loading}>
+          {#each Array(VISIBLE_FORECAST_HOURS) as _}
+            <Skeleton class="h-10 w-full" />
+          {/each}
+        </div>
+      {/if}
+    </ScrollArea.Root>
+  </Card.Root>
+
+  <div class="grid min-h-0 flex-1 gap-3 md:grid-cols-2 md:gap-4">
+    <Card.Root size="sm" class="min-h-0">
       <Card.Header class="border-b">
         <div class="flex items-center justify-between gap-3">
-          <div class="flex min-w-0 items-center gap-3">
-            <ListChecks class="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <div class="flex min-w-0 items-center gap-2.5">
+            <ListChecks class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <div class="min-w-0">
-              <Card.Title>{text.home.tasks}</Card.Title>
-              <Card.Description>{text.tasks[dayPart.id]}</Card.Description>
+              <Card.Title class="text-sm">{text.home.tasks}</Card.Title>
+              <Card.Description class="text-xs">{text.tasks[dayPart.id]}</Card.Description>
             </div>
           </div>
           <Badge variant="secondary">{visibleTasks.length}</Badge>
@@ -361,14 +430,14 @@
       </ScrollArea.Root>
     </Card.Root>
 
-    <Card.Root class="min-h-0">
+    <Card.Root size="sm" class="min-h-0">
       <Card.Header class="border-b">
         <div class="flex items-center justify-between gap-3">
-          <div class="flex min-w-0 items-center gap-3">
-            <CalendarDays class="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <div class="flex min-w-0 items-center gap-2.5">
+            <CalendarDays class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <div class="min-w-0">
-              <Card.Title>{text.home.calendar}</Card.Title>
-              <Card.Description>{text.tasks[dayPart.id]}</Card.Description>
+              <Card.Title class="text-sm">{text.home.calendar}</Card.Title>
+              <Card.Description class="text-xs">{text.tasks[dayPart.id]}</Card.Description>
             </div>
           </div>
           <Badge variant="secondary">{visibleEvents.length}</Badge>
