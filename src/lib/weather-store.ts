@@ -8,12 +8,15 @@ import {
   getWeatherSnapshot,
   WEATHER_REFRESH_INTERVAL,
   type CurrentWeather,
+  type DailyWeather,
   type HourlyWeather,
 } from "#lib/weather.js";
 
 type WeatherState = {
   current: CurrentWeather | null;
   hourly: HourlyWeather[];
+  daily: DailyWeather[];
+  updatedAt: number | null;
   unavailable: boolean;
 };
 
@@ -21,6 +24,8 @@ const WEATHER_CONTEXT_KEY = "minimalist-home:weather";
 const initialState: WeatherState = {
   current: null,
   hourly: [],
+  daily: [],
+  updatedAt: null,
   unavailable: false,
 };
 

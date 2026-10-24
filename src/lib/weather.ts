@@ -30,7 +30,18 @@ export type WeatherKind =
 
 export type CurrentWeather = {
   temperature: number;
+  apparentTemperature: number;
+  humidity: number;
+  precipitation: number;
+  cloudCover: number;
+  pressure: number;
+  windSpeed: number;
+  windDirection: number;
+  windGusts: number;
   unit: string;
+  precipitationUnit: string;
+  pressureUnit: string;
+  windUnit: string;
   code: number;
   isDay: boolean;
   description: string;
@@ -40,35 +51,109 @@ export type CurrentWeather = {
 export type HourlyWeather = CurrentWeather & {
   time: string;
   precipitationProbability: number;
-  windSpeed: number;
-  windUnit: string;
+  dewPoint: number;
+  cloudCoverLow: number;
+  cloudCoverMid: number;
+  cloudCoverHigh: number;
+  visibility: number;
+  uvIndex: number;
+};
+
+export type DailyWeather = {
+  time: string;
+  temperatureMax: number;
+  temperatureMin: number;
+  apparentTemperatureMax: number;
+  apparentTemperatureMin: number;
+  precipitationProbabilityMax: number;
+  precipitationSum: number;
+  windSpeedMax: number;
+  windGustsMax: number;
+  windDirection: number;
+  uvIndexMax: number;
+  sunrise: string;
+  sunset: string;
+  moonrise: string | null;
+  moonset: string | null;
+  moonPhase: number;
+  code: number;
+  description: string;
+  kind: WeatherKind;
 };
 
 export type WeatherSnapshot = {
   current: CurrentWeather;
   hourly: HourlyWeather[];
+  daily: DailyWeather[];
+  updatedAt: number;
 };
 
 type OpenMeteoResponse = {
   current?: {
     temperature_2m?: number;
+    apparent_temperature?: number;
+    relative_humidity_2m?: number;
+    precipitation?: number;
     weather_code?: number;
     is_day?: number;
+    cloud_cover?: number;
+    pressure_msl?: number;
+    wind_speed_10m?: number;
+    wind_direction_10m?: number;
+    wind_gusts_10m?: number;
   };
   current_units?: {
     temperature_2m?: string;
+    precipitation?: string;
+    pressure_msl?: string;
+    wind_speed_10m?: string;
   };
   hourly?: {
     time?: string[];
     temperature_2m?: number[];
+    apparent_temperature?: number[];
+    relative_humidity_2m?: number[];
+    dew_point_2m?: number[];
+    precipitation?: number[];
     precipitation_probability?: Array<number | null>;
     wind_speed_10m?: number[];
+    wind_direction_10m?: number[];
+    wind_gusts_10m?: number[];
+    pressure_msl?: number[];
+    cloud_cover?: number[];
+    cloud_cover_low?: number[];
+    cloud_cover_mid?: number[];
+    cloud_cover_high?: number[];
+    visibility?: number[];
+    uv_index?: number[];
     weather_code?: number[];
     is_day?: number[];
   };
   hourly_units?: {
     temperature_2m?: string;
+    precipitation?: string;
     wind_speed_10m?: string;
+    pressure_msl?: string;
+    visibility?: string;
+  };
+  daily?: {
+    time?: string[];
+    temperature_2m_max?: number[];
+    temperature_2m_min?: number[];
+    apparent_temperature_max?: number[];
+    apparent_temperature_min?: number[];
+    precipitation_probability_max?: Array<number | null>;
+    precipitation_sum?: number[];
+    weather_code?: number[];
+    sunrise?: string[];
+    sunset?: string[];
+    moonrise?: Array<string | null>;
+    moonset?: Array<string | null>;
+    moon_phase?: number[];
+    uv_index_max?: number[];
+    wind_speed_10m_max?: number[];
+    wind_gusts_10m_max?: number[];
+    wind_direction_10m_dominant?: number[];
   };
 };
 
@@ -128,12 +213,15 @@ function weatherUrl(location: DashboardLocation) {
   const parameters = new URLSearchParams({
     latitude: String(location.latitude),
     longitude: String(location.longitude),
-    current: "temperature_2m,weather_code,is_day",
+    current:
+      "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,is_day,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m",
     hourly:
-      "temperature_2m,precipitation_probability,wind_speed_10m,weather_code,is_day",
+      "temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m,precipitation,precipitation_probability,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,uv_index,weather_code,is_day",
+    daily:
+      "weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_probability_max,precipitation_sum,sunrise,sunset,moonrise,moonset,moon_phase,uv_index_max,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant",
     temperature_unit: "celsius",
     timezone: location.timezone,
-    forecast_hours: "12",
+    forecast_days: "7",
   });
 
   return `https://api.open-meteo.com/v1/forecast?${parameters}`;
@@ -162,20 +250,47 @@ function parseWeather(
   language: AppLanguage,
 ): CurrentWeather {
   const temperature = data.current?.temperature_2m;
+  const apparentTemperature = data.current?.apparent_temperature;
+  const humidity = data.current?.relative_humidity_2m;
+  const precipitation = data.current?.precipitation;
   const code = data.current?.weather_code;
   const isDay = data.current?.is_day;
+  const cloudCover = data.current?.cloud_cover;
+  const pressure = data.current?.pressure_msl;
+  const windSpeed = data.current?.wind_speed_10m;
+  const windDirection = data.current?.wind_direction_10m;
+  const windGusts = data.current?.wind_gusts_10m;
 
   if (
     typeof temperature !== "number" ||
+    typeof apparentTemperature !== "number" ||
+    typeof humidity !== "number" ||
+    typeof precipitation !== "number" ||
     typeof code !== "number" ||
-    typeof isDay !== "number"
+    typeof isDay !== "number" ||
+    typeof cloudCover !== "number" ||
+    typeof pressure !== "number" ||
+    typeof windSpeed !== "number" ||
+    typeof windDirection !== "number" ||
+    typeof windGusts !== "number"
   ) {
     throw new Error("Open-Meteo returned an unexpected response");
   }
 
   return {
     temperature,
+    apparentTemperature,
+    humidity,
+    precipitation,
+    cloudCover,
+    pressure,
+    windSpeed,
+    windDirection,
+    windGusts,
     unit: data.current_units?.temperature_2m ?? "°C",
+    precipitationUnit: data.current_units?.precipitation ?? "mm",
+    pressureUnit: data.current_units?.pressure_msl ?? "hPa",
+    windUnit: data.current_units?.wind_speed_10m ?? "km/h",
     code,
     isDay: isDay === 1,
     ...weatherDetails(code, language),
@@ -188,16 +303,42 @@ function parseHourlyWeather(
 ): HourlyWeather[] {
   const times = data.hourly?.time;
   const temperatures = data.hourly?.temperature_2m;
+  const apparentTemperatures = data.hourly?.apparent_temperature;
+  const humidity = data.hourly?.relative_humidity_2m;
+  const dewPoints = data.hourly?.dew_point_2m;
+  const precipitationAmount = data.hourly?.precipitation;
   const precipitation = data.hourly?.precipitation_probability;
   const windSpeeds = data.hourly?.wind_speed_10m;
+  const windDirections = data.hourly?.wind_direction_10m;
+  const windGusts = data.hourly?.wind_gusts_10m;
+  const pressure = data.hourly?.pressure_msl;
+  const cloudCover = data.hourly?.cloud_cover;
+  const cloudCoverLow = data.hourly?.cloud_cover_low;
+  const cloudCoverMid = data.hourly?.cloud_cover_mid;
+  const cloudCoverHigh = data.hourly?.cloud_cover_high;
+  const visibility = data.hourly?.visibility;
+  const uvIndex = data.hourly?.uv_index;
   const codes = data.hourly?.weather_code;
   const daylight = data.hourly?.is_day;
 
   if (
     !times ||
     !temperatures ||
+    !apparentTemperatures ||
+    !humidity ||
+    !dewPoints ||
+    !precipitationAmount ||
     !precipitation ||
     !windSpeeds ||
+    !windDirections ||
+    !windGusts ||
+    !pressure ||
+    !cloudCover ||
+    !cloudCoverLow ||
+    !cloudCoverMid ||
+    !cloudCoverHigh ||
+    !visibility ||
+    !uvIndex ||
     !codes ||
     !daylight
   ) {
@@ -206,13 +347,39 @@ function parseHourlyWeather(
 
   return times.map((time, index) => {
     const temperature = temperatures[index];
+    const apparentTemperature = apparentTemperatures[index];
+    const relativeHumidity = humidity[index];
+    const dewPoint = dewPoints[index];
+    const precipitationValue = precipitationAmount[index];
     const windSpeed = windSpeeds[index];
+    const windDirection = windDirections[index];
+    const gusts = windGusts[index];
+    const pressureValue = pressure[index];
+    const cloudCoverValue = cloudCover[index];
+    const lowClouds = cloudCoverLow[index];
+    const midClouds = cloudCoverMid[index];
+    const highClouds = cloudCoverHigh[index];
+    const visibilityValue = visibility[index];
+    const uvIndexValue = uvIndex[index];
     const code = codes[index];
     const isDay = daylight[index];
 
     if (
       typeof temperature !== "number" ||
+      typeof apparentTemperature !== "number" ||
+      typeof relativeHumidity !== "number" ||
+      typeof dewPoint !== "number" ||
+      typeof precipitationValue !== "number" ||
       typeof windSpeed !== "number" ||
+      typeof windDirection !== "number" ||
+      typeof gusts !== "number" ||
+      typeof pressureValue !== "number" ||
+      typeof cloudCoverValue !== "number" ||
+      typeof lowClouds !== "number" ||
+      typeof midClouds !== "number" ||
+      typeof highClouds !== "number" ||
+      typeof visibilityValue !== "number" ||
+      typeof uvIndexValue !== "number" ||
       typeof code !== "number" ||
       typeof isDay !== "number"
     ) {
@@ -222,12 +389,84 @@ function parseHourlyWeather(
     return {
       time,
       temperature,
+      apparentTemperature,
+      humidity: relativeHumidity,
+      dewPoint,
+      precipitation: precipitationValue,
+      precipitationUnit: data.hourly_units?.precipitation ?? "mm",
+      cloudCover: cloudCoverValue,
+      cloudCoverLow: lowClouds,
+      cloudCoverMid: midClouds,
+      cloudCoverHigh: highClouds,
+      visibility: visibilityValue,
+      uvIndex: uvIndexValue,
+      pressure: pressureValue,
+      pressureUnit: data.hourly_units?.pressure_msl ?? "hPa",
       unit: data.hourly_units?.temperature_2m ?? "°C",
       code,
       isDay: isDay === 1,
       precipitationProbability: precipitation[index] ?? 0,
       windSpeed,
+      windDirection,
+      windGusts: gusts,
       windUnit: data.hourly_units?.wind_speed_10m ?? "km/h",
+      ...weatherDetails(code, language),
+    };
+  });
+}
+
+function parseDailyWeather(
+  data: OpenMeteoResponse,
+  language: AppLanguage,
+): DailyWeather[] {
+  const daily = data.daily;
+  const required = [
+    daily?.time,
+    daily?.temperature_2m_max,
+    daily?.temperature_2m_min,
+    daily?.apparent_temperature_max,
+    daily?.apparent_temperature_min,
+    daily?.precipitation_probability_max,
+    daily?.precipitation_sum,
+    daily?.weather_code,
+    daily?.sunrise,
+    daily?.sunset,
+    daily?.moon_phase,
+    daily?.uv_index_max,
+    daily?.wind_speed_10m_max,
+    daily?.wind_gusts_10m_max,
+    daily?.wind_direction_10m_dominant,
+  ];
+
+  if (required.some((value) => !value)) {
+    throw new Error("Open-Meteo returned an unexpected daily response");
+  }
+
+  return daily!.time!.map((time, index) => {
+    const code = daily!.weather_code![index];
+    if (typeof code !== "number") {
+      throw new Error("Open-Meteo returned incomplete daily weather data");
+    }
+
+    return {
+      time,
+      temperatureMax: daily!.temperature_2m_max![index],
+      temperatureMin: daily!.temperature_2m_min![index],
+      apparentTemperatureMax: daily!.apparent_temperature_max![index],
+      apparentTemperatureMin: daily!.apparent_temperature_min![index],
+      precipitationProbabilityMax:
+        daily!.precipitation_probability_max![index] ?? 0,
+      precipitationSum: daily!.precipitation_sum![index],
+      windSpeedMax: daily!.wind_speed_10m_max![index],
+      windGustsMax: daily!.wind_gusts_10m_max![index],
+      windDirection: daily!.wind_direction_10m_dominant![index],
+      uvIndexMax: daily!.uv_index_max![index],
+      sunrise: daily!.sunrise![index],
+      sunset: daily!.sunset![index],
+      moonrise: daily!.moonrise?.[index] ?? null,
+      moonset: daily!.moonset?.[index] ?? null,
+      moonPhase: daily!.moon_phase![index],
+      code,
       ...weatherDetails(code, language),
     };
   });
@@ -264,7 +503,7 @@ async function requestOpenMeteoData(
 }
 
 function weatherCacheKey(location: DashboardLocation) {
-  return `weather:v2:${location.latitude}:${location.longitude}:${location.timezone}`;
+  return `weather:v3:${location.latitude}:${location.longitude}:${location.timezone}`;
 }
 
 function withAbort<T>(promise: Promise<T>, signal?: AbortSignal) {
@@ -358,5 +597,7 @@ export async function getWeatherSnapshot(
   return {
     current: parseWeather(data, language),
     hourly: parseHourlyWeather(data, language),
+    daily: parseDailyWeather(data, language),
+    updatedAt: Date.now(),
   };
 }

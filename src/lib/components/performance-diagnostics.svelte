@@ -11,7 +11,7 @@
   import { Button } from "#lib/components/ui/button/index.js";
   import * as Card from "#lib/components/ui/card/index.js";
 
-  const views: DashboardView[] = ["home", "calendar", "tasks", "settings"];
+  const views: DashboardView[] = ["home", "calendar", "tasks", "weather", "settings"];
   let text = $derived(translations[$appSettings.language]);
   let latestByView = $derived(
     views.flatMap((view) => {

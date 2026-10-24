@@ -1,6 +1,8 @@
 <script lang="ts">
   import {
     CalendarDays,
+    CloudSun,
+    Ellipsis,
     House,
     ListChecks,
     LoaderCircle,
@@ -29,6 +31,7 @@
   import { Button } from "#lib/components/ui/button/index.js";
   import * as Card from "#lib/components/ui/card/index.js";
   import * as Sidebar from "#lib/components/ui/sidebar/index.js";
+  import * as Sheet from "#lib/components/ui/sheet/index.js";
   import * as Tabs from "#lib/components/ui/tabs/index.js";
   import * as Tooltip from "#lib/components/ui/tooltip/index.js";
   import { setMode } from "mode-watcher";
@@ -40,6 +43,7 @@
   const taskStore = provideTaskStore();
   let returnTab = $state("home");
   let screensaverActive = $state(false);
+  let mobileMoreOpen = $state(false);
   let text = $derived(translations[$appSettings.language]);
   const isMobile = new IsMobile();
   provideWeatherStore();
@@ -91,6 +95,7 @@
     }
 
     navigation.activeTab = "photos";
+    mobileMoreOpen = false;
   }
 
   function exitPhotos() {
@@ -100,6 +105,12 @@
 
   function prepareTabChange(view: DashboardView) {
     if (navigation.activeTab !== view) beginTabTransition(view);
+  }
+
+  function openSettings() {
+    prepareTabChange("settings");
+    navigation.activeTab = "settings";
+    mobileMoreOpen = false;
   }
 </script>
 
@@ -193,6 +204,13 @@
                 </Tabs.Trigger>
                 <Tabs.Trigger
                   class="h-16 flex-none flex-col items-center justify-center gap-1 group-data-vertical/tabs:justify-center"
+                  value="weather"
+                  onclick={() => prepareTabChange("weather")}
+                >
+                  <CloudSun class="size-5" aria-hidden="true" />
+                </Tabs.Trigger>
+                <Tabs.Trigger
+                  class="h-16 flex-none flex-col items-center justify-center gap-1 group-data-vertical/tabs:justify-center"
                   value="photos"
                   onclick={enterPhotos}
                 >
@@ -213,11 +231,12 @@
             {@render children()}
           </Sidebar.Inset>
 
-          <Tabs.List
-            variant="line"
-            class="absolute inset-x-0 bottom-0 z-20 grid h-16 w-full grid-cols-5 rounded-none border-t bg-background/95 p-0 backdrop-blur group-data-horizontal/tabs:h-16 md:hidden"
-            aria-label="Dashboard sections"
-          >
+          <div class="absolute inset-x-0 bottom-0 z-20 grid h-16 grid-cols-5 border-t bg-background/95 backdrop-blur md:hidden">
+            <Tabs.List
+              variant="line"
+              class="col-span-4 grid h-16 w-full grid-cols-4 rounded-none bg-transparent p-0 group-data-horizontal/tabs:h-16"
+              aria-label="Dashboard sections"
+            >
             <Tabs.Trigger class="h-full flex-col gap-1 rounded-none text-[0.6875rem]" value="home" onclick={() => prepareTabChange("home")}>
               <House class="size-5" aria-hidden="true" />
               {text.nav.home}
@@ -230,19 +249,42 @@
               <ListChecks class="size-5" aria-hidden="true" />
               {text.nav.tasks}
             </Tabs.Trigger>
-            <Tabs.Trigger
-              class="h-full flex-col gap-1 rounded-none text-[0.6875rem]"
-              value="photos"
-              onclick={enterPhotos}
-            >
-              <Images class="size-5" aria-hidden="true" />
-              {text.nav.photos}
+            <Tabs.Trigger class="h-full flex-col gap-1 rounded-none text-[0.6875rem]" value="weather" onclick={() => prepareTabChange("weather")}>
+              <CloudSun class="size-5" aria-hidden="true" />
+              {text.nav.weather}
             </Tabs.Trigger>
-            <Tabs.Trigger class="h-full flex-col gap-1 rounded-none text-[0.6875rem]" value="settings" onclick={() => prepareTabChange("settings")}>
-              <Settings class="size-5" aria-hidden="true" />
-              {text.nav.settings}
-            </Tabs.Trigger>
-          </Tabs.List>
+            </Tabs.List>
+
+            <Sheet.Root bind:open={mobileMoreOpen}>
+              <Sheet.Trigger>
+                {#snippet child({ props })}
+                  <Button
+                    {...props}
+                    variant="ghost"
+                    class="h-full w-full flex-col gap-1 rounded-none text-[0.6875rem] {navigation.activeTab === 'settings' ? 'text-foreground' : 'text-muted-foreground'}"
+                  >
+                    <Ellipsis class="size-5" aria-hidden="true" />
+                    {text.nav.more}
+                  </Button>
+                {/snippet}
+              </Sheet.Trigger>
+              <Sheet.Content side="bottom" class="pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+                <Sheet.Header>
+                  <Sheet.Title>{text.nav.more}</Sheet.Title>
+                </Sheet.Header>
+                <div class="grid gap-2 px-4">
+                  <Button variant="ghost" class="h-14 justify-start" onclick={enterPhotos}>
+                    <Images class="size-5" aria-hidden="true" />
+                    {text.nav.photos}
+                  </Button>
+                  <Button variant="ghost" class="h-14 justify-start" onclick={openSettings}>
+                    <Settings class="size-5" aria-hidden="true" />
+                    {text.nav.settings}
+                  </Button>
+                </div>
+              </Sheet.Content>
+            </Sheet.Root>
+          </div>
         </Tabs.Root>
       </Sidebar.Provider>
     </div>

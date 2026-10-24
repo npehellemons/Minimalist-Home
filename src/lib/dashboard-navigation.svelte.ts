@@ -1,6 +1,6 @@
 import { getContext, setContext } from "svelte";
 
-export type DashboardView = "home" | "calendar" | "tasks" | "settings";
+export type DashboardView = "home" | "calendar" | "tasks" | "weather" | "settings";
 export type DashboardTab = DashboardView | "photos";
 
 type DashboardNavigation = {

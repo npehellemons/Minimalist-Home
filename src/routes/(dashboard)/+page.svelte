@@ -242,6 +242,17 @@
   />
 {/snippet}
 
+{#snippet weatherContent()}
+  <DashboardViewLoader
+    view="weather"
+    active={navigation.activeTab === "weather"}
+    workActive={navigation.activeTab === "weather" && navigation.documentVisible}
+    load={() => import("#lib/components/weather-view.svelte")}
+    errorLabel={text.onboarding.error}
+    retryLabel={text.onboarding.retry}
+  />
+{/snippet}
+
 {#snippet settingsContent()}
   <DashboardViewLoader
     view="settings"
@@ -264,6 +275,9 @@
 </DashboardTabPanel>
 <DashboardTabPanel value="tasks" active={navigation.activeTab === "tasks"}>
   {@render dashboardPage("Tasks", "Tasks content", true, tasksContent)}
+</DashboardTabPanel>
+<DashboardTabPanel value="weather" active={navigation.activeTab === "weather"}>
+  {@render dashboardPage(text.nav.weather, text.nav.weather, false, weatherContent)}
 </DashboardTabPanel>
 <DashboardTabPanel
   value="settings"
