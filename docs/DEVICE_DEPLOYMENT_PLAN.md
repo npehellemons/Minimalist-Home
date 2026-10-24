@@ -122,20 +122,29 @@ Phase complete when the installed dashboard behaves like a standalone app for a 
 
 ## Phase 3: Split Heavy Application Views
 
-Purpose: reduce startup parsing and the amount of UI retained in memory.
+Purpose: reduce startup parsing and make both first visits and repeat visits fast.
 
-- [ ] Move Home, Calendar, Tasks, Notes, and Settings into separately loaded SvelteKit views.
-- [ ] Keep the device shell, profile selection, clock, and shared weather store in the dashboard layout.
-- [ ] Load FullCalendar only when Calendar is first opened.
-- [ ] Destroy the FullCalendar DOM instance when Calendar is left.
-- [ ] Preserve normalized calendar data independently from the rendered calendar instance.
+The detailed investigation and implementation order live in
+`docs/PERFORMANCE_AUDIT.md`.
+
+- [ ] Add tab-switch timing and collect a baseline on the physical tablet.
+- [x] Move Home, Calendar, Tasks, and Settings into separately loaded view chunks.
+- [x] Keep the device shell, profile selection, clock, and shared weather store in the dashboard layout.
+- [x] Load FullCalendar only when Calendar is first opened.
+- [x] Paint a small Shadcn Skeleton shell before loading a view for the first time.
+- [x] Retain visited views and suppress inactive rendering with `content-visibility`.
+- [x] Pause inactive view timers, observers, subscriptions, and animations.
+- [ ] Add an LRU unmount policy only if tablet memory measurements require it.
+- [x] Preserve normalized calendar data independently from the rendered calendar instance.
 - [ ] Preload likely views only after the initial dashboard becomes idle.
 - [ ] Confirm profile selection continues to affect every view except Settings.
 - [ ] Compare production bundle chunks before and after the change.
 - [ ] Measure cold startup and tab-switch latency on the tablet.
 - [ ] Measure browser memory after visiting every view.
 
-Phase complete when Calendar is no longer part of the initial dashboard JavaScript path and inactive views do not retain large UI trees.
+Phase complete when Calendar is no longer part of the initial dashboard JavaScript
+path, first-use skeletons paint promptly, and warm tab changes visibly complete
+within 250 ms on the tablet.
 
 ## Phase 4: Calendar and Weather Work Scheduling
 
@@ -152,13 +161,15 @@ Already implemented:
 
 Remaining work:
 
-- [ ] Pause scheduled refreshes while the document is hidden.
-- [ ] On visibility return, refresh only data that is stale.
+- [x] Pause scheduled refreshes while the document is hidden.
+- [x] On visibility return, refresh through the existing stale-aware caches.
+- [x] Share one daily-task cache and Realtime channel between Home and Tasks.
+- [x] Render the latest current-day task snapshot while Supabase revalidates it.
 - [ ] Add exponential retry backoff with jitter.
 - [ ] Track last-attempt and last-success timestamps separately.
-- [ ] Normalize iCalendar data once and cache the normalized result.
+- [x] Normalize iCalendar data once and cache the normalized result.
 - [ ] Move expensive iCalendar parsing to a Web Worker if profiling shows long main-thread tasks.
-- [ ] Limit rendered events to the date range FullCalendar requests.
+- [x] Limit rendered events to the date range FullCalendar requests.
 - [ ] Place explicit size and age limits on persistent caches.
 - [ ] Add a diagnostic view for cache age and fetch errors.
 

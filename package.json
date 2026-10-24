@@ -23,7 +23,6 @@
   },
   "dependencies": {
     "@blobatar/svelte": "^2.7.0",
-    "@fullcalendar/icalendar": "^7.1.2",
     "@lucide/svelte": "^1.58.0",
     "@supabase/supabase-js": "^2.118.0",
     "bits-ui": "^2.19.5",

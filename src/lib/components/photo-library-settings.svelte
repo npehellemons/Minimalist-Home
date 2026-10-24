@@ -1,6 +1,5 @@
 <script lang="ts">
   import { EllipsisVertical, ImagePlus, Images, LoaderCircle } from "@lucide/svelte";
-  import { onMount } from "svelte";
   import { get } from "svelte/store";
 
   import { appSettings } from "#lib/app-settings.js";
@@ -21,12 +20,15 @@
   import { householdSession } from "#lib/household-session.js";
   import { translations } from "#lib/i18n.js";
 
+  let { active = true }: { active?: boolean } = $props();
+
   let fileInput: HTMLInputElement;
   let photos = $state<HouseholdPhoto[]>([]);
   let loading = $state(true);
   let uploading = $state(false);
   let removingIds = $state<string[]>([]);
   let error = $state("");
+  let hasLoadedPhotos = false;
   let text = $derived(translations[$appSettings.language]);
 
   async function loadPhotos(showLoader = false) {
@@ -87,17 +89,18 @@
     }
   }
 
-  onMount(() => {
-    const session = get(householdSession);
-    if (!session.household) return;
+  $effect(() => {
+    const householdId = $householdSession.household?.id;
+    if (!active || typeof window === "undefined" || !householdId) return;
 
-    void loadPhotos(true);
+    void loadPhotos(!hasLoadedPhotos);
+    hasLoadedPhotos = true;
     const refreshUrls = window.setInterval(
       () => void loadPhotos(),
       PHOTO_URL_REFRESH_INTERVAL,
     );
     const unsubscribePhotos = subscribeToHouseholdPhotos(
-      session.household.id,
+      householdId,
       () => void loadPhotos(),
     );
 

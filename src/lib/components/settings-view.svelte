@@ -35,6 +35,7 @@
   import { appLocale, translations } from "#lib/i18n.js";
   import ProfileAvatar from "#lib/components/profile-avatar.svelte";
   import PhotoLibrarySettings from "#lib/components/photo-library-settings.svelte";
+  import PerformanceDiagnostics from "#lib/components/performance-diagnostics.svelte";
   import { Badge } from "#lib/components/ui/badge/index.js";
   import { Button } from "#lib/components/ui/button/index.js";
   import * as Card from "#lib/components/ui/card/index.js";
@@ -43,6 +44,8 @@
   import * as ScrollArea from "#lib/components/ui/scroll-area/index.js";
   import { Separator } from "#lib/components/ui/separator/index.js";
   import { Switch } from "#lib/components/ui/switch/index.js";
+
+  let { active = true }: { active?: boolean } = $props();
 
   let calendarNames = $state<Record<string, string>>({});
   let calendarUrls = $state<Record<string, string>>({});
@@ -353,7 +356,7 @@
     </Card.Root>
 
     {#if canManageHousehold}
-      <PhotoLibrarySettings />
+      <PhotoLibrarySettings {active} />
     {/if}
 
     {#if canManageHousehold}
@@ -670,5 +673,7 @@
         </Card.Root>
       </div>
     </div>
+
+    <PerformanceDiagnostics />
   </div>
 </ScrollArea.Root>

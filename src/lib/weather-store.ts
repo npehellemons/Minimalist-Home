@@ -27,6 +27,7 @@ const initialState: WeatherState = {
 function createWeatherStore() {
   return readable<WeatherState>(initialState, (set) => {
     let activeRequest: AbortController | undefined;
+    let refreshInterval: number | undefined;
     let latestSettings: AppSettings;
     let settingsKey = "";
 
@@ -51,24 +52,43 @@ function createWeatherStore() {
       }
     }
 
+    function startRefreshInterval() {
+      window.clearInterval(refreshInterval);
+      refreshInterval = window.setInterval(
+        () => void update(latestSettings),
+        WEATHER_REFRESH_INTERVAL,
+      );
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        window.clearInterval(refreshInterval);
+        refreshInterval = undefined;
+        activeRequest?.abort();
+        return;
+      }
+
+      void update(latestSettings);
+      startRefreshInterval();
+    }
+
     const unsubscribeSettings = appSettings.subscribe((settings) => {
       latestSettings = settings;
       const nextKey = `${settings.location.latitude}:${settings.location.longitude}:${settings.location.timezone}:${settings.language}`;
 
       if (nextKey !== settingsKey) {
         settingsKey = nextKey;
-        void update(settings);
+        if (document.visibilityState === "visible") void update(settings);
       }
     });
-    const refreshInterval = window.setInterval(
-      () => void update(latestSettings),
-      WEATHER_REFRESH_INTERVAL,
-    );
+    if (document.visibilityState === "visible") startRefreshInterval();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       unsubscribeSettings();
       activeRequest?.abort();
       window.clearInterval(refreshInterval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   });
 }

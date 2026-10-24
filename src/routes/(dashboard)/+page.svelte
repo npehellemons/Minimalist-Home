@@ -10,25 +10,24 @@
     Moon,
     Sun,
   } from "@lucide/svelte";
-  import { onMount, type Snippet } from "svelte";
+  import type { Snippet } from "svelte";
   import {
     activeProfileId,
     appSettings,
   } from "#lib/app-settings.js";
-  import CalendarView from "#lib/components/calendar-view.svelte";
-  import HomeView from "#lib/components/home-view.svelte";
-  import SettingsView from "#lib/components/settings-view.svelte";
-  import TasksView from "#lib/components/tasks-view.svelte";
+  import DashboardViewLoader from "#lib/components/dashboard-view-loader.svelte";
+  import DashboardTabPanel from "#lib/components/dashboard-tab-panel.svelte";
+  import { getDashboardNavigation } from "#lib/dashboard-navigation.svelte.js";
   import { appLocale, translations } from "#lib/i18n.js";
   import { householdSession } from "#lib/household-session.js";
   import ProfileAvatar from "#lib/components/profile-avatar.svelte";
   import { Button } from "#lib/components/ui/button/index.js";
   import * as ScrollArea from "#lib/components/ui/scroll-area/index.js";
   import { Separator } from "#lib/components/ui/separator/index.js";
-  import * as Tabs from "#lib/components/ui/tabs/index.js";
   import { getWeatherStore } from "#lib/weather-store.js";
 
   let now = $state(new Date());
+  const navigation = getDashboardNavigation();
   const weatherStore = getWeatherStore();
   let weather = $derived($weatherStore.current);
   let weatherUnavailable = $derived($weatherStore.unavailable);
@@ -65,8 +64,11 @@
     }
   });
 
-  onMount(() => {
+  $effect(() => {
+    if (!navigation.documentVisible || typeof window === "undefined") return;
+
     let clockTimeout: number;
+    now = new Date();
 
     function scheduleClockUpdate() {
       const delayUntilNextMinute = 60_000 - (Date.now() % 60_000) + 50;
@@ -128,6 +130,7 @@
                   name={profile.name}
                   color={profile.color}
                   active={$activeProfileId === profile.id}
+                  animated={$activeProfileId === profile.id}
                 />
               </Button>
             {/each}
@@ -206,30 +209,65 @@
 {/snippet}
 
 {#snippet calendarContent()}
-  <CalendarView />
+  <DashboardViewLoader
+    view="calendar"
+    active={navigation.activeTab === "calendar"}
+    workActive={navigation.activeTab === "calendar" && navigation.documentVisible}
+    load={() => import("#lib/components/calendar-view.svelte")}
+    errorLabel={text.onboarding.error}
+    retryLabel={text.onboarding.retry}
+  />
 {/snippet}
 
 {#snippet homeContent()}
-  <HomeView {now} />
+  <DashboardViewLoader
+    view="home"
+    active={navigation.activeTab === "home"}
+    workActive={navigation.activeTab === "home" && navigation.documentVisible}
+    load={() => import("#lib/components/home-view.svelte")}
+    viewProps={{ now }}
+    errorLabel={text.onboarding.error}
+    retryLabel={text.onboarding.retry}
+  />
 {/snippet}
 
 {#snippet tasksContent()}
-  <TasksView />
+  <DashboardViewLoader
+    view="tasks"
+    active={navigation.activeTab === "tasks"}
+    workActive={navigation.activeTab === "tasks" && navigation.documentVisible}
+    load={() => import("#lib/components/tasks-view.svelte")}
+    errorLabel={text.onboarding.error}
+    retryLabel={text.onboarding.retry}
+  />
 {/snippet}
 
 {#snippet settingsContent()}
-  <SettingsView />
+  <DashboardViewLoader
+    view="settings"
+    active={navigation.activeTab === "settings"}
+    workActive={navigation.activeTab === "settings" && navigation.documentVisible}
+    load={() => import("#lib/components/settings-view.svelte")}
+    errorLabel={text.onboarding.error}
+    retryLabel={text.onboarding.retry}
+  />
 {/snippet}
 
-<Tabs.Content class="h-full p-0" value="home">
+<DashboardTabPanel value="home" active={navigation.activeTab === "home"}>
   {@render dashboardPage("Home", "Home content", true, homeContent)}
-</Tabs.Content>
-<Tabs.Content class="h-full p-0" value="calendar">
+</DashboardTabPanel>
+<DashboardTabPanel
+  value="calendar"
+  active={navigation.activeTab === "calendar"}
+>
   {@render dashboardPage("Calendar", "Calendar content", true, calendarContent)}
-</Tabs.Content>
-<Tabs.Content class="h-full p-0" value="tasks">
+</DashboardTabPanel>
+<DashboardTabPanel value="tasks" active={navigation.activeTab === "tasks"}>
   {@render dashboardPage("Tasks", "Tasks content", true, tasksContent)}
-</Tabs.Content>
-<Tabs.Content class="h-full p-0" value="settings">
+</DashboardTabPanel>
+<DashboardTabPanel
+  value="settings"
+  active={navigation.activeTab === "settings"}
+>
   {@render dashboardPage("Settings", "Settings content", true, settingsContent)}
-</Tabs.Content>
+</DashboardTabPanel>

@@ -14,6 +14,7 @@ export type HouseholdCalendarEvent = {
   profileName: string;
   profileColor: string;
   calendarName: string;
+  location: string;
 };
 
 type ParsedEventCacheEntry = {
@@ -27,7 +28,8 @@ type ParsedEventCacheEntry = {
   events: HouseholdCalendarEvent[];
 };
 
-const parsedEventCache = new Map<string, ParsedEventCacheEntry>();
+const MAX_CACHED_RANGES_PER_FEED = 8;
+const parsedEventCache = new Map<string, ParsedEventCacheEntry[]>();
 
 function calendarTimeToDate(time: ICAL.Time, fallbackTimeZone: string) {
   if (time.isDate || time.zone.tzid === "floating") {
@@ -85,6 +87,7 @@ function eventInstance(
     profileName: profile.name,
     profileColor: profile.color,
     calendarName,
+    location: event.location || "",
   };
 }
 
@@ -170,17 +173,19 @@ export async function getHouseholdCalendarEvents(
     feeds.map(async ({ profile, calendar }) => {
       const { calendarData } = await fetchCalendarFeed(calendar.url);
       const cacheKey = `${profile.id}:${calendar.id}`;
-      const cached = parsedEventCache.get(cacheKey);
+      const cachedEntries = parsedEventCache.get(cacheKey) ?? [];
+      const cached = cachedEntries.find(
+        (entry) =>
+          entry.calendarData === calendarData &&
+          entry.profileName === profile.name &&
+          entry.profileColor === profile.color &&
+          entry.calendarName === calendar.name &&
+          entry.timeZone === timeZone &&
+          entry.rangeStart === rangeStart.getTime() &&
+          entry.rangeEnd === rangeEnd.getTime(),
+      );
 
-      if (
-        cached?.calendarData === calendarData &&
-        cached.profileName === profile.name &&
-        cached.profileColor === profile.color &&
-        cached.calendarName === calendar.name &&
-        cached.timeZone === timeZone &&
-        cached.rangeStart === rangeStart.getTime() &&
-        cached.rangeEnd === rangeEnd.getTime()
-      ) {
+      if (cached) {
         return cached.events;
       }
 
@@ -193,7 +198,7 @@ export async function getHouseholdCalendarEvents(
         rangeEnd,
         timeZone,
       );
-      parsedEventCache.set(cacheKey, {
+      const cacheEntry = {
         calendarData,
         profileName: profile.name,
         profileColor: profile.color,
@@ -202,7 +207,20 @@ export async function getHouseholdCalendarEvents(
         rangeStart: rangeStart.getTime(),
         rangeEnd: rangeEnd.getTime(),
         events,
-      });
+      };
+      parsedEventCache.set(
+        cacheKey,
+        [cacheEntry, ...cachedEntries]
+          .filter(
+            (entry) =>
+              entry.calendarData === calendarData &&
+              entry.profileName === profile.name &&
+              entry.profileColor === profile.color &&
+              entry.calendarName === calendar.name &&
+              entry.timeZone === timeZone,
+          )
+          .slice(0, MAX_CACHED_RANGES_PER_FEED),
+      );
       return events;
     }),
   );

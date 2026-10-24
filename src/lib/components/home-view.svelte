@@ -1,6 +1,5 @@
 <script lang="ts">
   import { CalendarDays, Droplets, ListChecks, Repeat2 } from "@lucide/svelte";
-  import { onMount } from "svelte";
   import { get } from "svelte/store";
   import { Temporal } from "temporal-polyfill";
 
@@ -24,20 +23,20 @@
   import WeatherIcon from "#lib/components/weather-icon.svelte";
   import { householdSession } from "#lib/household-session.js";
   import { appLocale, translations } from "#lib/i18n.js";
+  import { getTaskStore } from "#lib/task-store.js";
   import {
     dateKeyInTimeZone,
-    getDailyTasks,
     setTaskCompleted,
-    subscribeToTasks,
     type DailyTask,
     type TaskDayPart,
   } from "#lib/tasks.js";
   import { getWeatherStore } from "#lib/weather-store.js";
 
-  let { now }: { now: Date } = $props();
+  let { now, active = true }: { now: Date; active?: boolean } = $props();
 
   const VISIBLE_FORECAST_HOURS = 8;
   const weatherStore = getWeatherStore();
+  const taskStore = getTaskStore();
 
   type DayPartWindow = {
     id: TaskDayPart;
@@ -49,19 +48,22 @@
     dayEnd: Date;
   };
 
-  let tasks = $state<DailyTask[]>([]);
   let calendarEvents = $state<HouseholdCalendarEvent[]>([]);
-  let tasksLoading = $state(true);
   let calendarLoading = $state(true);
-  let tasksError = $state("");
+  let taskActionError = $state("");
   let calendarError = $state("");
   let pendingCompletions = $state<string[]>([]);
-  let taskLoadKey = $state("");
   let calendarLoadKey = $state("");
-  let taskLoadGeneration = 0;
   let calendarLoadGeneration = 0;
+  let activationCount = 0;
 
   let text = $derived(translations[$appSettings.language]);
+  let tasks = $derived($taskStore.tasks);
+  let tasksLoading = $derived($taskStore.loading && tasks.length === 0);
+  let tasksError = $derived(
+    taskActionError ||
+      ($taskStore.error ? text.tasks.loadErrorDescription : ""),
+  );
   let locale = $derived(appLocale($appSettings.language));
   let hourlyForecast = $derived($weatherStore.hourly);
   let forecastUnavailable = $derived($weatherStore.unavailable);
@@ -177,27 +179,6 @@
     return `${formatter.format(event.start)}–${formatter.format(event.end)}`;
   }
 
-  async function loadTasks(showLoader = false) {
-    const session = get(householdSession);
-    if (!session.household) return;
-
-    const generation = ++taskLoadGeneration;
-    if (showLoader) tasksLoading = true;
-    tasksError = "";
-
-    try {
-      const nextTasks = await getDailyTasks(session.household.id, todayKey);
-      if (generation === taskLoadGeneration) tasks = nextTasks;
-    } catch (error) {
-      console.error("Unable to load tasks for home", error);
-      if (generation === taskLoadGeneration) {
-        tasksError = text.tasks.loadErrorDescription;
-      }
-    } finally {
-      if (generation === taskLoadGeneration) tasksLoading = false;
-    }
-  }
-
   async function loadCalendar(showLoader = false) {
     const generation = ++calendarLoadGeneration;
     const settings = get(appSettings);
@@ -228,12 +209,9 @@
     if (!session.household) return;
 
     const key = `${task.id}:${task.profileId}`;
+    taskActionError = "";
     pendingCompletions = [...pendingCompletions, key];
-    tasks = tasks.map((candidate) =>
-      candidate.id === task.id && candidate.profileId === task.profileId
-        ? { ...candidate, completed: true }
-        : candidate,
-    );
+    taskStore.setCompleted(task.id, task.profileId, true);
 
     try {
       await setTaskCompleted(
@@ -245,29 +223,24 @@
       );
     } catch (error) {
       console.error("Unable to complete task from home", error);
-      tasks = tasks.map((candidate) =>
-        candidate.id === task.id && candidate.profileId === task.profileId
-          ? { ...candidate, completed: false }
-          : candidate,
-      );
-      tasksError = text.tasks.completeError;
+      taskStore.setCompleted(task.id, task.profileId, false);
+      taskActionError = text.tasks.completeError;
     } finally {
       pendingCompletions = pendingCompletions.filter((item) => item !== key);
     }
   }
 
   $effect(() => {
-    const householdId = $householdSession.household?.id;
-    const nextLoadKey = householdId ? `${householdId}:${todayKey}` : "";
-    if (typeof window === "undefined" || !nextLoadKey || nextLoadKey === taskLoadKey) {
-      return;
-    }
+    if (!active) return;
 
-    taskLoadKey = nextLoadKey;
-    void loadTasks(true);
+    const householdId = $householdSession.household?.id;
+    if (typeof window === "undefined" || !householdId) return;
+    taskStore.ensure(householdId, todayKey);
   });
 
   $effect(() => {
+    if (!active) return;
+
     const nextLoadKey = JSON.stringify({
       date: todayKey,
       timezone: $appSettings.location.timezone,
@@ -289,20 +262,22 @@
     void loadCalendar(true);
   });
 
-  onMount(() => {
-    const session = get(householdSession);
-    const unsubscribeTasks = session.household
-      ? subscribeToTasks(session.household.id, () => void loadTasks())
-      : () => undefined;
+  $effect(() => {
+    const householdId = $householdSession.household?.id;
+    if (!active || typeof window === "undefined" || !householdId) return;
+
+    if (activationCount > 0) {
+      void loadCalendar();
+    }
+    activationCount += 1;
+
     const refreshCalendar = window.setInterval(
       () => void loadCalendar(),
       CALENDAR_REFRESH_INTERVAL + 5_000,
     );
 
     return () => {
-      taskLoadGeneration += 1;
       calendarLoadGeneration += 1;
-      unsubscribeTasks();
       window.clearInterval(refreshCalendar);
     };
   });

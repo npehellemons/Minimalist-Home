@@ -5,25 +5,23 @@
   import {
     activeProfileId,
     appSettings,
+    type AppSettings,
     type HouseholdProfile,
   } from "#lib/app-settings.js";
-  import {
-    CALENDAR_REFRESH_INTERVAL,
-    fetchCalendarFeed,
-  } from "#lib/calendar-feed.js";
+  import { getHouseholdCalendarEvents } from "#lib/calendar-events.js";
+  import { CALENDAR_REFRESH_INTERVAL } from "#lib/calendar-feed.js";
   import { appLocale, translations } from "#lib/i18n.js";
   import {
     Calendar,
     type EventApi,
-    type EventSourceInput,
-    type PluginInput,
+    type EventInput,
+    type EventSourceFuncInfo,
   } from "fullcalendar";
   import dayGridPlugin from "fullcalendar/daygrid";
   import enGbLocale from "fullcalendar/locales/en-gb";
   import nlLocale from "fullcalendar/locales/nl";
   import timeGridPlugin from "fullcalendar/timegrid";
   import formaThemePlugin from "fullcalendar/themes/forma";
-  import iCalendarPlugin from "@fullcalendar/icalendar";
   import "fullcalendar/skeleton.css";
   import "fullcalendar/themes/forma/theme.css";
   import "fullcalendar/themes/forma/palettes/red.css";
@@ -31,8 +29,11 @@
   import { Button } from "#lib/components/ui/button/index.js";
   import * as Popover from "#lib/components/ui/popover/index.js";
 
+  let { active = true }: { active?: boolean } = $props();
+
   let calendarElement: HTMLDivElement;
   let calendar: Calendar | undefined;
+  let calendarReady = $state(false);
   let calendarTitle = $state("");
   let currentView = $state("dayGridMonth");
   let eventPopoverOpen = $state(false);
@@ -57,16 +58,9 @@
   let visibleProfiles = $derived(
     profilesForSelection($appSettings.profiles, $activeProfileId),
   );
-  const calendarSources = new Map<
-    string,
-    { blobUrl: string; calendarData: string; color: string }
-  >();
   let calendarLoadGeneration = 0;
-
-  type OwnedCalendarFeed = HouseholdProfile["calendars"][number] & {
-    ownerId: string;
-    ownerColor: string;
-  };
+  let calendarSettingsKey = "";
+  let latestProfiles: HouseholdProfile[] = [];
 
   function readableTextColor(background: string) {
     const hex = background.replace("#", "");
@@ -107,80 +101,72 @@
     return `${date} · ${start}–${end}`;
   }
 
-  function clearCalendarFeeds() {
-    for (const [id, source] of calendarSources) {
-      calendar?.getEventSourceById(`ical-${id}`)?.remove();
-      URL.revokeObjectURL(source.blobUrl);
+  async function loadCalendarRange(info: EventSourceFuncInfo) {
+    const generation = calendarLoadGeneration;
+    const settings = get(appSettings);
+
+    try {
+      const events = await getHouseholdCalendarEvents(
+        latestProfiles,
+        info.start,
+        info.end,
+        settings.location.timezone,
+      );
+      if (generation !== calendarLoadGeneration) return [];
+
+      return events.map(
+        (event): EventInput => ({
+          id: event.id,
+          title: event.title,
+          start: event.start,
+          end: event.end,
+          allDay: event.allDay,
+          color: event.profileColor,
+          textColor: readableTextColor(event.profileColor),
+          extendedProps: {
+            location: event.location,
+            profileId: event.profileId,
+            profileName: event.profileName,
+            calendarName: event.calendarName,
+          },
+        }),
+      );
+    } catch (error) {
+      console.error("Unable to load calendar events", error);
+      return [];
     }
-    calendarSources.clear();
   }
 
-  async function syncCalendarFeeds(profiles: HouseholdProfile[]) {
-    const generation = ++calendarLoadGeneration;
-    const feeds: OwnedCalendarFeed[] = profiles.flatMap((profile) =>
-      profile.calendars.map((feed) => ({
-        ...feed,
-        ownerId: profile.id,
-        ownerColor: profile.color,
+  function applyCalendarSettings(
+    settings: AppSettings,
+    profiles: HouseholdProfile[],
+  ) {
+    calendar?.batchRendering(() => {
+      calendar?.setOption(
+        "locale",
+        settings.language === "nl" ? nlLocale : enGbLocale,
+      );
+      calendar?.setOption(
+        "allDayText",
+        translations[settings.language].calendar.allDay,
+      );
+      calendar?.setOption("timeZone", settings.location.timezone);
+    });
+
+    const nextKey = JSON.stringify({
+      timeZone: settings.location.timezone,
+      profiles: profiles.map((profile) => ({
+        id: profile.id,
+        name: profile.name,
+        color: profile.color,
+        calendars: profile.calendars,
       })),
-    );
-    const enabledFeeds = feeds.filter(
-      (feed) => feed.enabled && feed.url.trim(),
-    );
-    const activeSourceIds = new Set(
-      enabledFeeds.map((feed) => `${feed.ownerId}-${feed.id}`),
-    );
-
-    for (const [sourceId, source] of calendarSources) {
-      if (activeSourceIds.has(sourceId)) continue;
-
-      calendar?.getEventSourceById(`ical-${sourceId}`)?.remove();
-      URL.revokeObjectURL(source.blobUrl);
-      calendarSources.delete(sourceId);
+    });
+    if (nextKey !== calendarSettingsKey) {
+      calendarSettingsKey = nextKey;
+      calendarLoadGeneration += 1;
+      calendar?.refetchEvents();
     }
-
-    await Promise.all(
-      enabledFeeds.map(async (feed) => {
-        try {
-          const { calendarData } = await fetchCalendarFeed(feed.url);
-
-          if (generation !== calendarLoadGeneration) return;
-
-          const sourceId = `${feed.ownerId}-${feed.id}`;
-          const existingSource = calendarSources.get(sourceId);
-
-          if (
-            existingSource?.calendarData === calendarData &&
-            existingSource.color === feed.ownerColor
-          ) {
-            return;
-          }
-
-          if (existingSource) {
-            calendar?.getEventSourceById(`ical-${sourceId}`)?.remove();
-            URL.revokeObjectURL(existingSource.blobUrl);
-          }
-
-          const blobUrl = URL.createObjectURL(
-            new Blob([calendarData], { type: "text/calendar" }),
-          );
-          calendarSources.set(sourceId, {
-            blobUrl,
-            calendarData,
-            color: feed.ownerColor,
-          });
-          calendar?.addEventSource({
-            id: `ical-${sourceId}`,
-            url: blobUrl,
-            format: "ics",
-            color: feed.ownerColor,
-            contrastColor: readableTextColor(feed.ownerColor),
-          } as EventSourceInput);
-        } catch {
-          // A failing feed should not prevent other configured calendars loading.
-        }
-      }),
-    );
   }
 
   function changeView(view: string) {
@@ -188,20 +174,13 @@
   }
 
   onMount(() => {
-    const darkModeObserver = new MutationObserver(() => {
-      calendar?.setOption(
-        "colorScheme",
-        document.documentElement.classList.contains("dark") ? "dark" : "light",
-      );
-    });
-
     calendar = new Calendar(calendarElement, {
       plugins: [
         formaThemePlugin,
         dayGridPlugin,
         timeGridPlugin,
-        iCalendarPlugin as unknown as PluginInput,
       ],
+      events: loadCalendarRange,
       initialView: currentView,
       views: {
         timeGridThreeDay: {
@@ -248,14 +227,8 @@
     });
 
     calendar.render();
+    calendarReady = true;
 
-    darkModeObserver.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-
-    let calendarSettingsKey = "";
-    let latestProfiles: HouseholdProfile[] = [];
     const calendarSettings = derived(
       [appSettings, activeProfileId],
       ([settings, selectedProfileId]) => ({
@@ -266,42 +239,51 @@
     const unsubscribeSettings = calendarSettings.subscribe(
       ({ settings, profiles }) => {
         latestProfiles = profiles;
-        calendar?.setOption(
-          "locale",
-          settings.language === "nl" ? nlLocale : enGbLocale,
-        );
-        calendar?.setOption(
-          "allDayText",
-          translations[settings.language].calendar.allDay,
-        );
-        calendar?.setOption("timeZone", settings.location.timezone);
-
-        const nextKey = JSON.stringify(
-          profiles.map((profile) => ({
-            id: profile.id,
-            color: profile.color,
-            calendars: profile.calendars,
-          })),
-        );
-        if (nextKey !== calendarSettingsKey) {
-          calendarSettingsKey = nextKey;
-          void syncCalendarFeeds(profiles);
-        }
+        if (active) applyCalendarSettings(settings, profiles);
       },
-    );
-    const calendarRefreshInterval = window.setInterval(
-      () => void syncCalendarFeeds(latestProfiles),
-      CALENDAR_REFRESH_INTERVAL + 5_000,
     );
 
     return () => {
       unsubscribeSettings();
-      window.clearInterval(calendarRefreshInterval);
       calendarLoadGeneration += 1;
-      darkModeObserver.disconnect();
-      clearCalendarFeeds();
+      calendarReady = false;
       calendar?.destroy();
       calendar = undefined;
+    };
+  });
+
+  $effect(() => {
+    if (!active || !calendarReady || typeof window === "undefined") return;
+
+    const settings = get(appSettings);
+    const profiles = profilesForSelection(
+      settings.profiles,
+      get(activeProfileId),
+    );
+    latestProfiles = profiles;
+    applyCalendarSettings(settings, profiles);
+
+    const darkModeObserver = new MutationObserver(() => {
+      calendar?.setOption(
+        "colorScheme",
+        document.documentElement.classList.contains("dark") ? "dark" : "light",
+      );
+    });
+    darkModeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    const calendarRefreshInterval = window.setInterval(
+      () => calendar?.refetchEvents(),
+      CALENDAR_REFRESH_INTERVAL + 5_000,
+    );
+
+    return () => {
+      calendarLoadGeneration += 1;
+      calendarSettingsKey = "";
+      darkModeObserver.disconnect();
+      window.clearInterval(calendarRefreshInterval);
     };
   });
 </script>

@@ -10,12 +10,14 @@
     color,
     size = "default",
     active = false,
+    animated = false,
     class: className,
   }: {
     name: string;
     color: string;
     size?: "sm" | "default" | "lg";
     active?: boolean;
+    animated?: boolean;
     class?: string;
   } = $props();
 
@@ -31,13 +33,22 @@
 </script>
 
 <Avatar.Root {size} class={cn("bg-muted", className)}>
-  <Blobatar
-    name={name || "profile"}
-    background="circle"
-    palette={{ head: color, eye: contrastingEyeColor(color) }}
-    animate="always"
-    class="size-full"
-  />
+  {#if animated}
+    <Blobatar
+      name={name || "profile"}
+      background="circle"
+      palette={{ head: color, eye: contrastingEyeColor(color) }}
+      animate="always"
+      class="size-full"
+    />
+  {:else}
+    <Blobatar
+      name={name || "profile"}
+      background="circle"
+      palette={{ head: color, eye: contrastingEyeColor(color) }}
+      class="size-full"
+    />
+  {/if}
   {#if active}
     <Avatar.Badge class="bg-green-500" />
   {/if}

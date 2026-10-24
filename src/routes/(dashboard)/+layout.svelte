@@ -9,6 +9,10 @@
     Settings,
   } from "@lucide/svelte";
   import { appSettings } from "#lib/app-settings.js";
+  import {
+    provideDashboardNavigation,
+    type DashboardView,
+  } from "#lib/dashboard-navigation.svelte.js";
   import OnboardingView from "#lib/components/onboarding-view.svelte";
   import PhotoSlideshow from "#lib/components/photo-slideshow.svelte";
   import Screensaver from "#lib/components/screensaver.svelte";
@@ -17,6 +21,8 @@
     startHouseholdSession,
   } from "#lib/household-session.js";
   import { translations } from "#lib/i18n.js";
+  import { beginTabTransition } from "#lib/performance-metrics.js";
+  import { provideTaskStore } from "#lib/task-store.js";
   import { IsMobile } from "#lib/hooks/is-mobile.svelte.js";
   import { provideWeatherStore } from "#lib/weather-store.js";
   import * as Avatar from "#lib/components/ui/avatar/index.js";
@@ -30,14 +36,29 @@
   import { fade } from "svelte/transition";
 
   let { children } = $props();
-  let activeTab = $state("home");
+  const navigation = provideDashboardNavigation();
+  const taskStore = provideTaskStore();
   let returnTab = $state("home");
   let screensaverActive = $state(false);
   let text = $derived(translations[$appSettings.language]);
   const isMobile = new IsMobile();
   provideWeatherStore();
 
-  onMount(() => startHouseholdSession());
+  onMount(() => {
+    const stopHouseholdSession = startHouseholdSession();
+    const updateVisibility = () => {
+      navigation.documentVisible = document.visibilityState === "visible";
+    };
+
+    updateVisibility();
+    document.addEventListener("visibilitychange", updateVisibility);
+
+    return () => {
+      document.removeEventListener("visibilitychange", updateVisibility);
+      taskStore.destroy();
+      stopHouseholdSession();
+    };
+  });
 
   $effect(() => {
     const preferredMode = $appSettings.colorMode;
@@ -45,7 +66,7 @@
   });
 
   $effect(() => {
-    if (activeTab !== "photos") returnTab = activeTab;
+    if (navigation.activeTab !== "photos") returnTab = navigation.activeTab;
   });
 
   function enterScreensaver() {
@@ -69,12 +90,16 @@
       });
     }
 
-    activeTab = "photos";
+    navigation.activeTab = "photos";
   }
 
   function exitPhotos() {
-    activeTab = returnTab;
+    navigation.activeTab = returnTab as DashboardView;
     if (document.fullscreenElement) void document.exitFullscreen();
+  }
+
+  function prepareTabChange(view: DashboardView) {
+    if (navigation.activeTab !== view) beginTabTransition(view);
   }
 </script>
 
@@ -102,7 +127,7 @@
     <div class="absolute inset-0" transition:fade={{ duration: 250 }}>
       <Screensaver onExit={exitScreensaver} />
     </div>
-  {:else if activeTab === "photos"}
+  {:else if navigation.activeTab === "photos"}
     <div class="absolute inset-0" transition:fade={{ duration: 250 }}>
       <PhotoSlideshow onExit={exitPhotos} />
     </div>
@@ -113,7 +138,7 @@
         style="--sidebar-width: 5rem; --sidebar-width-mobile: 7rem;"
       >
         <Tabs.Root
-          bind:value={activeTab}
+          bind:value={navigation.activeTab}
           orientation={isMobile.current ? "horizontal" : "vertical"}
           activationMode="automatic"
           class="relative h-full w-full flex-row gap-0"
@@ -148,18 +173,21 @@
                 <Tabs.Trigger
                   class="h-16 flex-none flex-col items-center justify-center gap-1 group-data-vertical/tabs:justify-center"
                   value="home"
+                  onclick={() => prepareTabChange("home")}
                 >
                   <House class="size-5" aria-hidden="true" />
                 </Tabs.Trigger>
                 <Tabs.Trigger
                   class="h-16 flex-none flex-col items-center justify-center gap-1 group-data-vertical/tabs:justify-center"
                   value="calendar"
+                  onclick={() => prepareTabChange("calendar")}
                 >
                   <CalendarDays class="size-5" aria-hidden="true" />
                 </Tabs.Trigger>
                 <Tabs.Trigger
                   class="h-16 flex-none flex-col items-center justify-center gap-1 group-data-vertical/tabs:justify-center"
                   value="tasks"
+                  onclick={() => prepareTabChange("tasks")}
                 >
                   <ListChecks class="size-5" aria-hidden="true" />
                 </Tabs.Trigger>
@@ -173,6 +201,7 @@
                 <Tabs.Trigger
                   class="mt-auto h-16 flex-none flex-col items-center justify-center gap-1 group-data-vertical/tabs:justify-center"
                   value="settings"
+                  onclick={() => prepareTabChange("settings")}
                 >
                   <Settings class="size-5" aria-hidden="true" />
                 </Tabs.Trigger>
@@ -189,15 +218,15 @@
             class="absolute inset-x-0 bottom-0 z-20 grid h-16 w-full grid-cols-5 rounded-none border-t bg-background/95 p-0 backdrop-blur group-data-horizontal/tabs:h-16 md:hidden"
             aria-label="Dashboard sections"
           >
-            <Tabs.Trigger class="h-full flex-col gap-1 rounded-none text-[0.6875rem]" value="home">
+            <Tabs.Trigger class="h-full flex-col gap-1 rounded-none text-[0.6875rem]" value="home" onclick={() => prepareTabChange("home")}>
               <House class="size-5" aria-hidden="true" />
               {text.nav.home}
             </Tabs.Trigger>
-            <Tabs.Trigger class="h-full flex-col gap-1 rounded-none text-[0.6875rem]" value="calendar">
+            <Tabs.Trigger class="h-full flex-col gap-1 rounded-none text-[0.6875rem]" value="calendar" onclick={() => prepareTabChange("calendar")}>
               <CalendarDays class="size-5" aria-hidden="true" />
               {text.nav.calendar}
             </Tabs.Trigger>
-            <Tabs.Trigger class="h-full flex-col gap-1 rounded-none text-[0.6875rem]" value="tasks">
+            <Tabs.Trigger class="h-full flex-col gap-1 rounded-none text-[0.6875rem]" value="tasks" onclick={() => prepareTabChange("tasks")}>
               <ListChecks class="size-5" aria-hidden="true" />
               {text.nav.tasks}
             </Tabs.Trigger>
@@ -209,7 +238,7 @@
               <Images class="size-5" aria-hidden="true" />
               {text.nav.photos}
             </Tabs.Trigger>
-            <Tabs.Trigger class="h-full flex-col gap-1 rounded-none text-[0.6875rem]" value="settings">
+            <Tabs.Trigger class="h-full flex-col gap-1 rounded-none text-[0.6875rem]" value="settings" onclick={() => prepareTabChange("settings")}>
               <Settings class="size-5" aria-hidden="true" />
               {text.nav.settings}
             </Tabs.Trigger>

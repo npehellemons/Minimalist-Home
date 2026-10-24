@@ -1,6 +1,5 @@
 <script lang="ts">
   import { EllipsisVertical, ListChecks, Plus, Repeat2 } from "@lucide/svelte";
-  import { onMount } from "svelte";
   import { get } from "svelte/store";
 
   import {
@@ -24,13 +23,12 @@
   import * as Tabs from "#lib/components/ui/tabs/index.js";
   import { householdSession } from "#lib/household-session.js";
   import { translations } from "#lib/i18n.js";
+  import { getTaskStore } from "#lib/task-store.js";
   import {
     createTask,
     dateKeyInTimeZone,
     deleteTask,
-    getDailyTasks,
     setTaskCompleted,
-    subscribeToTasks,
     updateTask,
     type DailyTask,
     type ChoreRecurrence,
@@ -45,6 +43,8 @@
 
   type RoutineFrequency = "daily" | "selected-days";
 
+  let { active = true }: { active?: boolean } = $props();
+
   const weekdays = [
     { id: "monday", value: 1 },
     { id: "tuesday", value: 2 },
@@ -55,6 +55,7 @@
     { id: "sunday", value: 0 },
   ] as const;
   const everyDay = weekdays.map((day) => day.value);
+  const taskStore = getTaskStore();
 
   const dayBlocks: DayBlock[] = [
     { id: "morning", range: "00:00 - 12:00" },
@@ -98,9 +99,7 @@
   );
   let now = $state(initialNow);
   let selectedBlockId = $state<TaskDayPart>(initialBlock);
-  let tasks = $state<DailyTask[]>([]);
-  let loading = $state(true);
-  let loadError = $state("");
+  let taskActionError = $state("");
   let pendingCompletions = $state<string[]>([]);
   let createOpen = $state(false);
   let creating = $state(false);
@@ -124,6 +123,12 @@
   let taskToDelete = $state<DailyTask | null>(null);
 
   let text = $derived(translations[$appSettings.language]);
+  let tasks = $derived($taskStore.tasks);
+  let loading = $derived($taskStore.loading && tasks.length === 0);
+  let loadError = $derived(
+    taskActionError ||
+      ($taskStore.error ? text.tasks.loadErrorDescription : ""),
+  );
   let activeBlockId = $derived(
     currentDayBlock(now, $appSettings.location.timezone),
   );
@@ -161,23 +166,6 @@
         task.profileId === profile.id &&
         (task.kind === "chore" || task.dayPart === selectedBlockId),
     );
-  }
-
-  async function loadTasks(showLoader = false) {
-    const session = get(householdSession);
-    if (!session.household) return;
-
-    if (showLoader) loading = true;
-    loadError = "";
-
-    try {
-      tasks = await getDailyTasks(session.household.id, todayKey);
-    } catch (error) {
-      console.error("Unable to load household tasks", error);
-      loadError = text.tasks.loadErrorDescription;
-    } finally {
-      loading = false;
-    }
   }
 
   function openCreateTask() {
@@ -269,7 +257,7 @@
         await createTask(taskInput);
       }
       createOpen = false;
-      await loadTasks();
+      await taskStore.refresh();
     } catch (error) {
       console.error("Unable to save household task", error);
       createError = editingTaskId
@@ -286,7 +274,8 @@
 
     const pendingKey = `${task.id}\u0000${task.profileId}`;
     const previous = task.completed;
-    task.completed = completed;
+    taskActionError = "";
+    taskStore.setCompleted(task.id, task.profileId, completed);
     pendingCompletions = [...pendingCompletions, pendingKey];
 
     try {
@@ -298,8 +287,8 @@
         completed,
       );
     } catch {
-      task.completed = previous;
-      loadError = text.tasks.completeError;
+      taskStore.setCompleted(task.id, task.profileId, previous);
+      taskActionError = text.tasks.completeError;
     } finally {
       pendingCompletions = pendingCompletions.filter((key) => key !== pendingKey);
     }
@@ -322,7 +311,7 @@
     try {
       const taskId = taskToDelete.id;
       await deleteTask(session.household.id, taskId);
-      tasks = tasks.filter((task) => task.id !== taskId);
+      taskStore.removeTask(taskId);
       deleteOpen = false;
       taskToDelete = null;
     } catch (error) {
@@ -333,19 +322,12 @@
     }
   }
 
-  onMount(() => {
-    let refreshTimeout: number | undefined;
-    let unsubscribe = () => {};
-    const session = get(householdSession);
+  $effect(() => {
+    const householdId = $householdSession.household?.id;
 
-    void loadTasks(true);
+    if (!active || typeof window === "undefined" || !householdId) return;
 
-    if (session.household) {
-      unsubscribe = subscribeToTasks(session.household.id, () => {
-        window.clearTimeout(refreshTimeout);
-        refreshTimeout = window.setTimeout(() => void loadTasks(), 120);
-      });
-    }
+    taskStore.ensure(householdId, todayKey);
 
     const clockInterval = window.setInterval(() => {
       const previousDayKey = dateKeyInTimeZone(
@@ -371,14 +353,15 @@
         previousDayKey !==
         dateKeyInTimeZone(nextNow, $appSettings.location.timezone)
       ) {
-        void loadTasks();
+        taskStore.ensure(
+          householdId,
+          dateKeyInTimeZone(nextNow, $appSettings.location.timezone),
+        );
       }
     }, 60_000);
 
     return () => {
       window.clearInterval(clockInterval);
-      window.clearTimeout(refreshTimeout);
-      unsubscribe();
     };
   });
 </script>
