@@ -172,8 +172,8 @@
     {:else}
       <Tabs.Content value="forecast" class="min-h-0 flex-1">
         <ScrollArea.Root class="h-full">
-          <div class="grid auto-rows-max gap-3 p-3 md:grid-cols-12 md:gap-4 md:p-5">
-            <Card.Root size="sm" class="overflow-hidden py-0 md:col-span-12">
+          <div class="grid auto-rows-max gap-3 p-3 md:grid-cols-12 md:gap-4 md:p-4">
+            <Card.Root size="sm" class="overflow-hidden py-0 md:col-span-12 md:row-start-1">
               <Card.Content class="grid gap-0 px-0 md:grid-cols-12">
                 <section class="flex min-w-0 items-center gap-4 border-b p-4 md:col-span-5 md:border-r md:border-b-0 md:p-5">
                   <WeatherIcon kind={current.kind} isDay={current.isDay} class="size-14 shrink-0 md:size-16" />
@@ -210,7 +210,7 @@
               </Card.Content>
             </Card.Root>
 
-            <Card.Root size="sm" class="overflow-hidden py-0 md:col-span-12">
+            <Card.Root size="sm" class="overflow-hidden py-0 md:col-span-7 md:row-start-2">
               <Card.Content class="flex-row! flex-wrap items-center gap-3 px-4 py-3">
                 <div class="flex items-center gap-2">
                   <Dog class="size-5 text-muted-foreground" />
@@ -231,7 +231,7 @@
               </Card.Content>
             </Card.Root>
 
-            <Card.Root size="sm" class="min-w-0 overflow-hidden py-0 md:col-span-12">
+            <Card.Root size="sm" class="min-w-0 overflow-hidden py-0 md:col-span-7 md:row-start-3">
               <div class="px-4 pt-3"><Card.Title class="text-sm">{text.weather.hourly}</Card.Title></div>
               <ScrollArea.Root orientation="horizontal" class="w-full min-w-0" viewportClass="w-full max-w-full">
                 <div class="flex w-max min-w-full flex-row divide-x px-1 py-2">
@@ -248,14 +248,14 @@
               </ScrollArea.Root>
             </Card.Root>
 
-            <Card.Root size="sm" class="md:col-span-12">
-              <Card.Header><Card.Title class="text-sm">{text.weather.sevenDays}</Card.Title></Card.Header>
-              <Card.Content class="grid gap-1">
+            <Card.Root size="sm" class="overflow-hidden py-0 md:col-span-5 md:col-start-8 md:row-start-2 md:row-span-2">
+              <div class="px-4 pt-3"><Card.Title class="text-sm">{text.weather.sevenDays}</Card.Title></div>
+              <Card.Content class="grid gap-0 px-4 pb-3">
                 {#each daily as day, index}
-                  <div class="grid grid-cols-[minmax(5rem,1fr)_2rem_4.5rem_4.5rem] items-center gap-3 border-t py-2 first:border-t-0 md:grid-cols-[minmax(7rem,1fr)_2rem_7rem_7rem_7rem]">
-                    <span class="truncate text-sm font-medium">{index === 0 ? text.weather.today : dayLabel(day.time, true)}</span>
+                  <div class="grid grid-cols-[minmax(5rem,1fr)_1.5rem_4rem_3.5rem] items-center gap-2 border-t py-1.5 first:border-t-0 md:grid-cols-[minmax(5rem,1fr)_1.5rem_3.5rem_3rem_4.5rem]">
+                    <span class="truncate text-xs font-medium">{index === 0 ? text.weather.today : dayLabel(day.time, true)}</span>
                     <WeatherIcon kind={day.kind} isDay={true} class="size-5" />
-                    <span class="text-sm tabular-nums"><strong>{Math.round(day.temperatureMax)}°</strong> / {Math.round(day.temperatureMin)}°</span>
+                    <span class="text-xs tabular-nums"><strong>{Math.round(day.temperatureMax)}°</strong> / {Math.round(day.temperatureMin)}°</span>
                     <span class="flex items-center gap-1 text-xs text-muted-foreground"><Droplets class="size-3.5" />{day.precipitationProbabilityMax}%</span>
                     <span class="hidden items-center gap-1 text-xs text-muted-foreground md:flex"><Wind class="size-3.5" />{Math.round(day.windSpeedMax)} {current.windUnit}</span>
                   </div>
@@ -263,7 +263,7 @@
               </Card.Content>
             </Card.Root>
 
-            <p class="text-xs text-muted-foreground md:col-span-12">
+            <p class="text-xs text-muted-foreground md:col-span-12 md:row-start-4">
               Data: Open-Meteo
             </p>
           </div>
