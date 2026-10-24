@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { CalendarDays, Droplets, ListChecks, Repeat2 } from "@lucide/svelte";
+  import {
+    CalendarDays,
+    Droplets,
+    ListChecks,
+    Repeat2,
+    Wind,
+  } from "@lucide/svelte";
   import { get } from "svelte/store";
   import { Temporal } from "temporal-polyfill";
 
@@ -34,7 +40,7 @@
 
   let { now, active = true }: { now: Date; active?: boolean } = $props();
 
-  const VISIBLE_FORECAST_HOURS = 8;
+  const VISIBLE_FORECAST_HOURS = 7;
   const weatherStore = getWeatherStore();
   const taskStore = getTaskStore();
 
@@ -284,15 +290,15 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col gap-3 overflow-hidden bg-muted/30 p-3 md:gap-4 md:p-6">
-  <Card.Root size="sm" class="shrink-0 py-0">
+  <Card.Root size="sm" class="hidden shrink-0 py-0 md:flex">
     <ScrollArea.Root orientation="horizontal" class="w-full" viewportClass="w-full">
       {#if visibleForecast.length > 0}
-        <div class="grid min-w-[44rem] grid-cols-8 divide-x">
+        <div class="grid min-w-[52rem] grid-cols-7 divide-x">
           {#each visibleForecast as forecast}
             {@const forecastTime = forecast.time.slice(11, 16)}
             <div
               class="flex min-w-0 items-center justify-center gap-2 px-3 py-3"
-              aria-label={`${forecastTime}, ${forecast.description}, ${Math.round(forecast.temperature)} ${text.weather.degrees}, ${forecast.precipitationProbability}% ${text.weather.precipitation}`}
+              aria-label={`${forecastTime}, ${forecast.description}, ${Math.round(forecast.temperature)} ${text.weather.degrees}, ${forecast.precipitationProbability}% ${text.weather.precipitation}, ${Math.round(forecast.windSpeed)} ${forecast.windUnit} ${text.weather.wind}`}
             >
               <WeatherIcon
                 kind={forecast.kind}
@@ -312,6 +318,10 @@
                     {forecast.precipitationProbability}%
                   </span>
                 </div>
+                <span class="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Wind class="size-3" aria-hidden="true" />
+                  {Math.round(forecast.windSpeed)} {forecast.windUnit}
+                </span>
               </div>
             </div>
           {/each}
@@ -321,7 +331,7 @@
           {text.weather.unavailable}
         </div>
       {:else}
-        <div class="grid min-w-[44rem] grid-cols-8 gap-3 p-3" aria-label={text.weather.loading}>
+        <div class="grid min-w-[52rem] grid-cols-7 gap-3 p-3" aria-label={text.weather.loading}>
           {#each Array(VISIBLE_FORECAST_HOURS) as _}
             <Skeleton class="h-10 w-full" />
           {/each}

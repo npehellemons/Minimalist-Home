@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Droplets } from "@lucide/svelte";
+  import { Droplets, Wind } from "@lucide/svelte";
   import { onMount } from "svelte";
   import { appSettings } from "#lib/app-settings.js";
   import { appLocale, translations } from "#lib/i18n.js";
@@ -8,7 +8,7 @@
   import { Skeleton } from "#lib/components/ui/skeleton/index.js";
   import WeatherIcon from "#lib/components/weather-icon.svelte";
 
-  const VISIBLE_FORECAST_HOURS = 8;
+  const VISIBLE_FORECAST_HOURS = 7;
 
   let { onExit }: { onExit: () => void } = $props();
 
@@ -120,7 +120,7 @@
               {@const forecastTime = forecast.time.slice(11, 16)}
               <article
                 class="flex min-w-0 flex-col items-center justify-between border-l px-3 first:border-l-0"
-                aria-label={`${forecastTime}, ${forecast.description}, ${Math.round(forecast.temperature)} ${text.weather.degrees}, ${forecast.precipitationProbability}% ${text.weather.precipitation}`}
+                aria-label={`${forecastTime}, ${forecast.description}, ${Math.round(forecast.temperature)} ${text.weather.degrees}, ${forecast.precipitationProbability}% ${text.weather.precipitation}, ${Math.round(forecast.windSpeed)} ${forecast.windUnit} ${text.weather.wind}`}
               >
                 <time
                   class="text-sm font-medium tabular-nums text-muted-foreground"
@@ -140,6 +140,10 @@
                   <Droplets class="size-3.5" aria-hidden="true" />
                   {forecast.precipitationProbability}%
                 </span>
+                <span class="flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                  <Wind class="size-3.5" aria-hidden="true" />
+                  {Math.round(forecast.windSpeed)} {forecast.windUnit}
+                </span>
               </article>
             {/each}
           </div>
@@ -148,7 +152,7 @@
             {text.weather.unavailable}
           </div>
         {:else}
-          <div class="grid h-full grid-cols-8 gap-4" aria-label={text.weather.loading}>
+          <div class="grid h-full grid-cols-7 gap-4" aria-label={text.weather.loading}>
             {#each Array(VISIBLE_FORECAST_HOURS) as _}
               <Skeleton class="h-full w-full" />
             {/each}

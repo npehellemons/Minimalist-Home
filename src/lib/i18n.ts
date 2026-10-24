@@ -121,6 +121,7 @@ export const translations = {
       loading: "Weersverwachting laden",
       degrees: "graden Celsius",
       precipitation: "kans op neerslag",
+      wind: "windsnelheid",
     },
     photos: {
       library: "Foto's",
@@ -363,6 +364,7 @@ export const translations = {
       loading: "Loading weather forecast",
       degrees: "degrees Celsius",
       precipitation: "chance of precipitation",
+      wind: "wind speed",
     },
     photos: {
       library: "Photos",

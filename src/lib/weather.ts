@@ -40,6 +40,8 @@ export type CurrentWeather = {
 export type HourlyWeather = CurrentWeather & {
   time: string;
   precipitationProbability: number;
+  windSpeed: number;
+  windUnit: string;
 };
 
 export type WeatherSnapshot = {
@@ -60,11 +62,13 @@ type OpenMeteoResponse = {
     time?: string[];
     temperature_2m?: number[];
     precipitation_probability?: Array<number | null>;
+    wind_speed_10m?: number[];
     weather_code?: number[];
     is_day?: number[];
   };
   hourly_units?: {
     temperature_2m?: string;
+    wind_speed_10m?: string;
   };
 };
 
@@ -126,7 +130,7 @@ function weatherUrl(location: DashboardLocation) {
     longitude: String(location.longitude),
     current: "temperature_2m,weather_code,is_day",
     hourly:
-      "temperature_2m,precipitation_probability,weather_code,is_day",
+      "temperature_2m,precipitation_probability,wind_speed_10m,weather_code,is_day",
     temperature_unit: "celsius",
     timezone: location.timezone,
     forecast_hours: "12",
@@ -185,20 +189,30 @@ function parseHourlyWeather(
   const times = data.hourly?.time;
   const temperatures = data.hourly?.temperature_2m;
   const precipitation = data.hourly?.precipitation_probability;
+  const windSpeeds = data.hourly?.wind_speed_10m;
   const codes = data.hourly?.weather_code;
   const daylight = data.hourly?.is_day;
 
-  if (!times || !temperatures || !precipitation || !codes || !daylight) {
+  if (
+    !times ||
+    !temperatures ||
+    !precipitation ||
+    !windSpeeds ||
+    !codes ||
+    !daylight
+  ) {
     throw new Error("Open-Meteo returned an unexpected hourly response");
   }
 
   return times.map((time, index) => {
     const temperature = temperatures[index];
+    const windSpeed = windSpeeds[index];
     const code = codes[index];
     const isDay = daylight[index];
 
     if (
       typeof temperature !== "number" ||
+      typeof windSpeed !== "number" ||
       typeof code !== "number" ||
       typeof isDay !== "number"
     ) {
@@ -212,6 +226,8 @@ function parseHourlyWeather(
       code,
       isDay: isDay === 1,
       precipitationProbability: precipitation[index] ?? 0,
+      windSpeed,
+      windUnit: data.hourly_units?.wind_speed_10m ?? "km/h",
       ...weatherDetails(code, language),
     };
   });
@@ -248,7 +264,7 @@ async function requestOpenMeteoData(
 }
 
 function weatherCacheKey(location: DashboardLocation) {
-  return `weather:${location.latitude}:${location.longitude}:${location.timezone}`;
+  return `weather:v2:${location.latitude}:${location.longitude}:${location.timezone}`;
 }
 
 function withAbort<T>(promise: Promise<T>, signal?: AbortSignal) {
