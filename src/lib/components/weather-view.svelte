@@ -2,6 +2,7 @@
   import {
     Cloud,
     CloudMoon,
+    Compass,
     Dog,
     Droplets,
     Eye,
@@ -9,10 +10,12 @@
     Moon,
     Sunrise,
     Sunset,
+    Telescope,
     Wind,
   } from "@lucide/svelte";
   import { onMount } from "svelte";
   import { appSettings } from "#lib/app-settings.js";
+  import { getObservationTargets } from "#lib/astronomy-targets.js";
   import { appLocale, translations } from "#lib/i18n.js";
   import { getWeatherStore } from "#lib/weather-store.js";
   import {
@@ -84,6 +87,24 @@
       return { day, score };
     }),
   );
+  let observationDates = $derived(
+    nightHours.map((hour) => {
+      const index = hourly.findIndex((candidate) => candidate.time === hour.time);
+      const currentHour = new Date(now);
+      currentHour.setMinutes(0, 0, 0);
+      return new Date(currentHour.getTime() + Math.max(0, index - currentHourIndex) * 3_600_000);
+    }),
+  );
+  let observationTargets = $derived(
+    today
+      ? getObservationTargets(
+          $appSettings.location.latitude,
+          $appSettings.location.longitude,
+          observationDates,
+          today.moonPhase,
+        )
+      : [],
+  );
 
   onMount(() => {
     const interval = window.setInterval(() => {
@@ -144,16 +165,32 @@
     return text.weather.moonWaningCrescent;
   }
 
+  function targetLabel(id: string) {
+    return text.weather.targets[id as keyof typeof text.weather.targets] ?? id;
+  }
+
+  function equipmentLabel(equipment: "eyes" | "binoculars" | "telescope") {
+    return text.weather.equipment[equipment];
+  }
+
+  function observationTime(value: Date) {
+    return new Intl.DateTimeFormat(locale, {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: $appSettings.location.timezone,
+    }).format(value);
+  }
+
 </script>
 
 <div class="flex h-full min-h-0 flex-col bg-muted/30">
   <Tabs.Root bind:value={selectedView} class="flex min-h-0 flex-1 flex-col gap-0">
     <div class="shrink-0 border-b bg-background px-3 py-2 md:px-6">
-      <Tabs.List class="h-9! w-full flex-row! md:w-auto">
-        <Tabs.Trigger value="forecast" class="flex-1 md:flex-none">
+      <Tabs.List class="grid! h-9! w-full grid-cols-2! md:w-64">
+        <Tabs.Trigger value="forecast" class="w-auto! min-w-0 justify-center!">
           {text.weather.forecast}
         </Tabs.Trigger>
-        <Tabs.Trigger value="sky" class="flex-1 md:flex-none">
+        <Tabs.Trigger value="sky" class="w-auto! min-w-0 justify-center!">
           {text.weather.skyConditions}
         </Tabs.Trigger>
       </Tabs.List>
@@ -175,12 +212,12 @@
           <div class="grid auto-rows-max gap-3 p-3 md:grid-cols-12 md:gap-4 md:p-4">
             <Card.Root size="sm" class="overflow-hidden py-0 md:col-span-12 md:row-start-1">
               <Card.Content class="grid gap-0 px-0 md:grid-cols-12">
-                <section class="flex min-w-0 items-center gap-4 border-b p-4 md:col-span-5 md:border-r md:border-b-0 md:p-5">
-                  <WeatherIcon kind={current.kind} isDay={current.isDay} class="size-14 shrink-0 md:size-16" />
+                <section class="flex min-w-0 items-center gap-3 border-b p-3 md:col-span-5 md:border-r md:border-b-0">
+                  <WeatherIcon kind={current.kind} isDay={current.isDay} class="size-12 shrink-0" />
                   <div class="min-w-0">
                     <p class="text-xs font-medium text-muted-foreground">{text.weather.current} · {$appSettings.location.name}</p>
                     <div class="mt-1 flex items-end gap-3">
-                      <strong class="text-5xl font-semibold leading-none tabular-nums">
+                      <strong class="text-4xl font-semibold leading-none tabular-nums">
                         {Math.round(current.temperature)}°
                       </strong>
                       <span class="pb-1 text-sm text-muted-foreground">
@@ -191,9 +228,9 @@
                   </div>
                 </section>
 
-                <section class="border-b p-4 md:col-span-4 md:border-r md:border-b-0 md:p-5">
-                  <h2 class="mb-3 text-sm font-semibold">{text.weather.today}</h2>
-                  <div class="grid grid-cols-2 gap-x-5 gap-y-3 text-sm">
+                <section class="border-b p-3 md:col-span-4 md:border-r md:border-b-0">
+                  <h2 class="mb-2 text-sm font-semibold">{text.weather.today}</h2>
+                  <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                     <div><span class="text-xs text-muted-foreground">{text.weather.highLow}</span><strong class="block">{Math.round(today.temperatureMax)}° / {Math.round(today.temperatureMin)}°</strong></div>
                     <div><span class="text-xs text-muted-foreground">{text.weather.precipitation}</span><strong class="block">{today.precipitationProbabilityMax}% · {today.precipitationSum} mm</strong></div>
                     <div class="flex items-center gap-2"><Sunrise class="size-4 text-muted-foreground" /> {timeLabel(today.sunrise)}</div>
@@ -201,7 +238,7 @@
                   </div>
                 </section>
 
-                <section class="grid grid-cols-2 content-center gap-3 p-4 text-sm md:col-span-3 md:grid-cols-1 md:p-5">
+                <section class="grid grid-cols-2 content-center gap-2 p-3 text-sm md:col-span-3 md:grid-cols-1">
                   <span class="flex items-center gap-2"><Droplets class="size-4 text-muted-foreground" /> {current.humidity}%</span>
                   <span class="flex items-center gap-2"><Cloud class="size-4 text-muted-foreground" /> {current.cloudCover}%</span>
                   <span class="flex items-center gap-2"><Wind class="size-4 text-muted-foreground" /> {windDirection(current.windDirection)} {Math.round(current.windSpeed)} {current.windUnit}</span>
@@ -272,10 +309,10 @@
 
       <Tabs.Content value="sky" class="min-h-0 flex-1">
         <ScrollArea.Root class="h-full">
-          <div class="grid auto-rows-max gap-3 p-3 md:grid-cols-12 md:gap-4 md:p-5">
+          <div class="grid auto-rows-max gap-3 p-3 md:grid-cols-12 md:gap-3 md:p-4">
             <Card.Root size="sm" class="overflow-hidden py-0 md:col-span-12">
               <Card.Content class="grid gap-0 px-0 md:grid-cols-12">
-                <section class="grid gap-2 border-b p-4 md:col-span-5 md:border-r md:border-b-0">
+                <section class="grid gap-1.5 border-b p-3 md:col-span-5 md:border-r md:border-b-0">
                   <div class="flex items-center justify-between gap-3">
                     <div>
                       <Card.Title class="text-sm">{text.weather.tonight}</Card.Title>
@@ -294,8 +331,8 @@
                   </div>
                 </section>
 
-                <section class="flex items-center gap-4 border-b p-4 md:col-span-4 md:border-r md:border-b-0">
-                  <Moon class="size-10 shrink-0 text-muted-foreground" />
+                <section class="flex items-center gap-3 border-b p-3 md:col-span-4 md:border-r md:border-b-0">
+                  <Moon class="size-9 shrink-0 text-muted-foreground" />
                   <div class="min-w-0">
                     <p class="text-xs font-medium text-muted-foreground">{text.weather.moon}</p>
                     <strong>{moonLabel(today.moonPhase)}</strong>
@@ -303,7 +340,7 @@
                   </div>
                 </section>
 
-                <section class="grid content-center gap-3 p-4 text-sm md:col-span-3">
+                <section class="grid content-center gap-2 p-3 text-sm md:col-span-3">
                   <span class="flex items-center gap-2"><Sunset class="size-4 text-muted-foreground" /> {text.weather.sunset} {timeLabel(today.sunset)}</span>
                   <span class="flex items-center gap-2"><Sunrise class="size-4 text-muted-foreground" /> {text.weather.sunrise} {timeLabel(today.sunrise)}</span>
                 </section>
@@ -338,6 +375,28 @@
             </Card.Root>
 
             <Card.Root size="sm" class="min-w-0 overflow-hidden py-0 md:col-span-12">
+              <div class="flex items-center gap-2 px-4 pt-3">
+                <Telescope class="size-4 text-muted-foreground" />
+                <Card.Title class="text-sm">{text.weather.observingTargets}</Card.Title>
+              </div>
+              <div class="grid grid-cols-2 divide-x px-1 py-2 md:grid-cols-4">
+                {#each observationTargets as target}
+                  <div class="grid min-w-0 gap-1 px-3 py-1">
+                    <div class="flex items-center justify-between gap-2">
+                      <strong class="truncate text-sm">{targetLabel(target.id)}</strong>
+                      <Badge variant="outline">{target.altitude}°</Badge>
+                    </div>
+                    <span class="truncate text-xs text-muted-foreground">{equipmentLabel(target.equipment)}</span>
+                    <span class="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Compass class="size-3.5" />
+                      {windDirection(target.azimuth)} · {observationTime(target.time)}
+                    </span>
+                  </div>
+                {/each}
+              </div>
+            </Card.Root>
+
+            <Card.Root size="sm" class="min-w-0 overflow-hidden py-0 md:col-span-12">
               <div class="px-4 pt-3"><Card.Title class="text-sm">{text.weather.upcomingNights}</Card.Title></div>
               <ScrollArea.Root orientation="horizontal" class="w-full min-w-0" viewportClass="w-full max-w-full">
                 <div class="flex w-max min-w-full flex-row divide-x px-1 py-2">
@@ -354,7 +413,7 @@
             </Card.Root>
 
             <p class="text-xs text-muted-foreground md:col-span-12">
-              Data: Open-Meteo
+              Data: Open-Meteo · Astronomy Engine
             </p>
           </div>
         </ScrollArea.Root>
