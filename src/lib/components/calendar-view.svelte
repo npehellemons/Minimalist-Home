@@ -122,7 +122,12 @@
           end: event.end,
           allDay: event.allDay,
           color: event.profileColor,
-          textColor: readableTextColor(event.profileColor),
+          contrastColor: readableTextColor(event.profileColor),
+          display:
+            event.allDay &&
+            event.end.getTime() - event.start.getTime() > 26 * 60 * 60 * 1000
+              ? "block"
+              : "list-item",
           extendedProps: {
             location: event.location,
             profileId: event.profileId,

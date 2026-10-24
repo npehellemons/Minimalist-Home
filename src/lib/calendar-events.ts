@@ -111,9 +111,26 @@ function parseEvents(
   const calendar = new ICAL.Component(ICAL.parse(calendarData));
   registerTimeZones(calendar);
   const events: HouseholdCalendarEvent[] = [];
+  const sourceEvents = calendar
+    .getAllSubcomponents("vevent")
+    .map((component) => new ICAL.Event(component));
+  const recurrenceExceptions = sourceEvents.filter((event) =>
+    event.isRecurrenceException(),
+  );
+  const exceptionKeys = new Set(
+    recurrenceExceptions.flatMap((event) =>
+      event.recurrenceId
+        ? [
+            `${event.uid}\u0000${calendarTimeToDate(
+              event.recurrenceId,
+              timeZone,
+            ).getTime()}`,
+          ]
+        : [],
+    ),
+  );
 
-  for (const component of calendar.getAllSubcomponents("vevent")) {
-    const sourceEvent = new ICAL.Event(component);
+  for (const sourceEvent of sourceEvents) {
     if (sourceEvent.isRecurrenceException() || isCancelled(sourceEvent)) continue;
 
     if (!sourceEvent.isRecurring()) {
@@ -131,12 +148,27 @@ function parseEvents(
     }
 
     const iterator = sourceEvent.iterator();
+    const excludedStarts = new Set(
+      sourceEvent.component
+        .getAllProperties("exdate")
+        .flatMap((property) => property.getValues())
+        .flatMap((excluded) =>
+          excluded instanceof ICAL.Time
+            ? [calendarTimeToDate(excluded, timeZone).getTime()]
+            : [],
+        ),
+    );
     let occurrence = iterator.next();
     let iterations = 0;
 
     while (occurrence && iterations < 20_000) {
       iterations += 1;
       const details = sourceEvent.getOccurrenceDetails(occurrence);
+      const occurrenceTime = calendarTimeToDate(
+        details.startDate,
+        timeZone,
+      ).getTime();
+      const exceptionKey = `${sourceEvent.uid}\u0000${occurrenceTime}`;
       const event = eventInstance(
         details.item,
         details.startDate,
@@ -148,11 +180,31 @@ function parseEvents(
       );
 
       if (event.start >= rangeEnd) break;
-      if (!isCancelled(details.item) && eventOverlapsRange(event, rangeStart, rangeEnd)) {
+      if (
+        !isCancelled(details.item) &&
+        !excludedStarts.has(occurrenceTime) &&
+        !exceptionKeys.has(exceptionKey) &&
+        eventOverlapsRange(event, rangeStart, rangeEnd)
+      ) {
         events.push(event);
       }
       occurrence = iterator.next();
     }
+  }
+
+  for (const exception of recurrenceExceptions) {
+    if (isCancelled(exception)) continue;
+
+    const event = eventInstance(
+      exception,
+      exception.startDate,
+      exception.endDate,
+      profile,
+      calendarId,
+      calendarName,
+      timeZone,
+    );
+    if (eventOverlapsRange(event, rangeStart, rangeEnd)) events.push(event);
   }
 
   return events;
