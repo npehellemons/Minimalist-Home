@@ -9,7 +9,6 @@
     Moon,
     Sunrise,
     Sunset,
-    Umbrella,
     Wind,
   } from "@lucide/svelte";
   import { onMount } from "svelte";
@@ -18,13 +17,12 @@
   import { getWeatherStore } from "#lib/weather-store.js";
   import {
     bestSkyWindow,
-    bestWalkPeriod,
     findCurrentHourIndex,
     getSkyConditions,
     getTodayHours,
     getUpcomingNight,
-    groupWeatherPeriods,
-    type WeatherPeriod,
+    precipitationStatus,
+    skyScore,
   } from "#lib/weather-insights.js";
   import { Badge } from "#lib/components/ui/badge/index.js";
   import * as Card from "#lib/components/ui/card/index.js";
@@ -45,9 +43,19 @@
   let hourly = $derived($weatherStore.hourly);
   let daily = $derived($weatherStore.daily);
   let todayHours = $derived(getTodayHours(hourly, now, $appSettings.location.timezone));
-  let weatherPeriods = $derived(groupWeatherPeriods(todayHours));
-  let walkPeriod = $derived(bestWalkPeriod([...weatherPeriods]));
-  let nextWetPeriod = $derived(weatherPeriods.find((period) => period.status === "wet"));
+  let bestWalkHours = $derived(
+    todayHours
+      .filter((hour) => precipitationStatus(hour) === "dry")
+      .sort((first, second) => {
+        const cloudDifference = first.cloudCover - second.cloudCover;
+        if (cloudDifference !== 0) return cloudDifference;
+        const rainDifference = first.precipitationProbability - second.precipitationProbability;
+        if (rainDifference !== 0) return rainDifference;
+        return first.windGusts - second.windGusts;
+      })
+      .slice(0, 3)
+      .sort((first, second) => first.time.localeCompare(second.time)),
+  );
   let currentHourIndex = $derived(
     findCurrentHourIndex(hourly, now, $appSettings.location.timezone),
   );
@@ -64,6 +72,18 @@
       : 0,
   );
   let today = $derived(daily[0]);
+  let nightSummaries = $derived(
+    daily.map((day, index) => {
+      const nextSunrise = daily[index + 1]?.sunrise;
+      const hours = hourly.filter(
+        (hour) => hour.time >= day.sunset && (!nextSunrise || hour.time < nextSunrise) && !hour.isDay,
+      );
+      const score = hours.length > 0
+        ? Math.round(hours.reduce((sum, hour) => sum + skyScore(hour), 0) / hours.length)
+        : 0;
+      return { day, score };
+    }),
+  );
 
   onMount(() => {
     const interval = window.setInterval(() => {
@@ -76,9 +96,9 @@
     return value?.slice(11, 16) ?? "--:--";
   }
 
-  function periodLabel(period: WeatherPeriod | undefined) {
-    if (!period) return text.weather.noDryPeriod;
-    return `${timeLabel(period.start)}–${timeLabel(period.end)}`;
+  function hourRangeLabel(value: string) {
+    const hour = Number(value.slice(11, 13));
+    return `${timeLabel(value)}–${String((hour + 1) % 24).padStart(2, "0")}:00`;
   }
 
   function windowEndLabel(period: typeof bestViewingWindow) {
@@ -124,17 +144,12 @@
     return text.weather.moonWaningCrescent;
   }
 
-  function statusLabel(status: WeatherPeriod["status"]) {
-    if (status === "dry") return text.weather.dry;
-    if (status === "wet") return text.weather.rain;
-    return text.weather.uncertain;
-  }
 </script>
 
 <div class="flex h-full min-h-0 flex-col bg-muted/30">
   <Tabs.Root bind:value={selectedView} class="flex min-h-0 flex-1 flex-col gap-0">
     <div class="shrink-0 border-b bg-background px-3 py-2 md:px-6">
-      <Tabs.List class="w-full md:w-auto">
+      <Tabs.List class="h-9! w-full flex-row! md:w-auto">
         <Tabs.Trigger value="forecast" class="flex-1 md:flex-none">
           {text.weather.forecast}
         </Tabs.Trigger>
@@ -157,115 +172,79 @@
     {:else}
       <Tabs.Content value="forecast" class="min-h-0 flex-1">
         <ScrollArea.Root class="h-full">
-          <div class="grid gap-3 p-3 md:grid-cols-12 md:gap-4 md:p-6">
-            <Card.Root size="sm" class="md:col-span-5">
-              <Card.Content class="flex h-full items-center gap-5">
-                <WeatherIcon kind={current.kind} isDay={current.isDay} class="size-16 shrink-0 md:size-20" />
-                <div class="min-w-0">
-                  <p class="text-sm text-muted-foreground">{text.weather.current} · {$appSettings.location.name}</p>
-                  <div class="flex items-end gap-3">
-                    <strong class="text-5xl font-semibold leading-none tabular-nums md:text-6xl">
-                      {Math.round(current.temperature)}°
-                    </strong>
-                    <span class="pb-1 text-sm text-muted-foreground">
-                      {text.weather.feelsLike} {Math.round(current.apparentTemperature)}°
-                    </span>
-                  </div>
-                  <p class="mt-2 font-medium">{current.description}</p>
-                </div>
-              </Card.Content>
-            </Card.Root>
-
-            <Card.Root size="sm" class="md:col-span-4">
-              <Card.Header>
-                <Card.Title class="text-sm">{text.weather.today}</Card.Title>
-              </Card.Header>
-              <Card.Content class="grid grid-cols-2 gap-x-5 gap-y-3 text-sm">
-                <div><span class="text-muted-foreground">{text.weather.highLow}</span><strong class="block">{Math.round(today.temperatureMax)}° / {Math.round(today.temperatureMin)}°</strong></div>
-                <div><span class="text-muted-foreground">{text.weather.precipitation}</span><strong class="block">{today.precipitationProbabilityMax}% · {today.precipitationSum} mm</strong></div>
-                <div class="flex items-center gap-2"><Sunrise class="size-4 text-muted-foreground" /> {timeLabel(today.sunrise)}</div>
-                <div class="flex items-center gap-2"><Sunset class="size-4 text-muted-foreground" /> {timeLabel(today.sunset)}</div>
-              </Card.Content>
-            </Card.Root>
-
-            <Card.Root size="sm" class="md:col-span-3">
-              <Card.Header>
-                <Card.Title class="text-sm">{text.weather.current}</Card.Title>
-              </Card.Header>
-              <Card.Content class="grid grid-cols-2 gap-3 text-sm md:grid-cols-1">
-                <span class="flex items-center gap-2"><Droplets class="size-4 text-muted-foreground" /> {current.humidity}%</span>
-                <span class="flex items-center gap-2"><Cloud class="size-4 text-muted-foreground" /> {current.cloudCover}%</span>
-                <span class="flex items-center gap-2"><Wind class="size-4 text-muted-foreground" /> {windDirection(current.windDirection)} {Math.round(current.windSpeed)} {current.windUnit}</span>
-                <span class="flex items-center gap-2"><Gauge class="size-4 text-muted-foreground" /> {Math.round(current.pressure)} {current.pressureUnit}</span>
-              </Card.Content>
-            </Card.Root>
-
-            <Card.Root size="sm" class="md:col-span-12">
-              <Card.Header class="border-b">
-                <div class="flex items-center justify-between gap-3">
-                  <div class="flex items-center gap-2">
-                    <Dog class="size-5 text-muted-foreground" />
-                    <div>
-                      <Card.Title class="text-sm">{text.weather.dogWalk}</Card.Title>
-                      <Card.Description>{text.weather.bestWalk}</Card.Description>
+          <div class="grid auto-rows-max gap-3 p-3 md:grid-cols-12 md:gap-4 md:p-5">
+            <Card.Root size="sm" class="overflow-hidden py-0 md:col-span-12">
+              <Card.Content class="grid gap-0 px-0 md:grid-cols-12">
+                <section class="flex min-w-0 items-center gap-4 border-b p-4 md:col-span-5 md:border-r md:border-b-0 md:p-5">
+                  <WeatherIcon kind={current.kind} isDay={current.isDay} class="size-14 shrink-0 md:size-16" />
+                  <div class="min-w-0">
+                    <p class="text-xs font-medium text-muted-foreground">{text.weather.current} · {$appSettings.location.name}</p>
+                    <div class="mt-1 flex items-end gap-3">
+                      <strong class="text-5xl font-semibold leading-none tabular-nums">
+                        {Math.round(current.temperature)}°
+                      </strong>
+                      <span class="pb-1 text-sm text-muted-foreground">
+                        {text.weather.feelsLike} {Math.round(current.apparentTemperature)}°
+                      </span>
                     </div>
+                    <p class="mt-1 text-sm font-medium">{current.description}</p>
                   </div>
-                  {#if walkPeriod}
-                    <Badge variant={walkPeriod.status === "dry" ? "default" : "secondary"}>
-                      {periodLabel(walkPeriod)}
+                </section>
+
+                <section class="border-b p-4 md:col-span-4 md:border-r md:border-b-0 md:p-5">
+                  <h2 class="mb-3 text-sm font-semibold">{text.weather.today}</h2>
+                  <div class="grid grid-cols-2 gap-x-5 gap-y-3 text-sm">
+                    <div><span class="text-xs text-muted-foreground">{text.weather.highLow}</span><strong class="block">{Math.round(today.temperatureMax)}° / {Math.round(today.temperatureMin)}°</strong></div>
+                    <div><span class="text-xs text-muted-foreground">{text.weather.precipitation}</span><strong class="block">{today.precipitationProbabilityMax}% · {today.precipitationSum} mm</strong></div>
+                    <div class="flex items-center gap-2"><Sunrise class="size-4 text-muted-foreground" /> {timeLabel(today.sunrise)}</div>
+                    <div class="flex items-center gap-2"><Sunset class="size-4 text-muted-foreground" /> {timeLabel(today.sunset)}</div>
+                  </div>
+                </section>
+
+                <section class="grid grid-cols-2 content-center gap-3 p-4 text-sm md:col-span-3 md:grid-cols-1 md:p-5">
+                  <span class="flex items-center gap-2"><Droplets class="size-4 text-muted-foreground" /> {current.humidity}%</span>
+                  <span class="flex items-center gap-2"><Cloud class="size-4 text-muted-foreground" /> {current.cloudCover}%</span>
+                  <span class="flex items-center gap-2"><Wind class="size-4 text-muted-foreground" /> {windDirection(current.windDirection)} {Math.round(current.windSpeed)} {current.windUnit}</span>
+                  <span class="flex items-center gap-2"><Gauge class="size-4 text-muted-foreground" /> {Math.round(current.pressure)} {current.pressureUnit}</span>
+                </section>
+              </Card.Content>
+            </Card.Root>
+
+            <Card.Root size="sm" class="overflow-hidden py-0 md:col-span-12">
+              <Card.Content class="flex-row! flex-wrap items-center gap-3 px-4 py-3">
+                <div class="flex items-center gap-2">
+                  <Dog class="size-5 text-muted-foreground" />
+                  <div>
+                    <Card.Title class="text-sm">{text.weather.dogWalk}</Card.Title>
+                    <Card.Description class="text-xs">{text.weather.bestWalk}</Card.Description>
+                  </div>
+                </div>
+                <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 md:justify-end">
+                  {#each bestWalkHours as hour}
+                    <Badge variant="outline">
+                      {hourRangeLabel(hour.time)} · {hour.cloudCover}% {text.weather.cloudCover.toLowerCase()}
                     </Badge>
-                  {/if}
-                </div>
-              </Card.Header>
-              <Card.Content class="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-                <div>
-                  <div class="mb-3 flex h-2.5 overflow-hidden rounded-full bg-muted" aria-label={text.weather.dryPeriods}>
-                    {#each weatherPeriods as period}
-                      <div
-                        class={period.status === "dry"
-                          ? "bg-emerald-500"
-                          : period.status === "wet"
-                            ? "bg-sky-500"
-                            : "bg-muted-foreground/35"}
-                        style:width={`${(period.hours.length / Math.max(todayHours.length, 1)) * 100}%`}
-                        title={`${periodLabel(period)} · ${statusLabel(period.status)}`}
-                      ></div>
-                    {/each}
-                  </div>
-                  <p class="mb-2 text-xs font-medium text-muted-foreground">{text.weather.dryPeriods}</p>
-                  <div class="flex flex-wrap gap-2">
-                    {#each weatherPeriods.filter((period) => period.status !== "wet") as period}
-                      <Badge variant="outline">
-                        {periodLabel(period)} · {statusLabel(period.status)}
-                      </Badge>
-                    {:else}
-                      <span class="text-sm text-muted-foreground">{text.weather.noDryPeriod}</span>
-                    {/each}
-                  </div>
-                </div>
-                <div class="flex items-center gap-2 text-sm">
-                  <Umbrella class="size-4 text-muted-foreground" />
-                  {nextWetPeriod
-                    ? `${text.weather.nextRain}: ${timeLabel(nextWetPeriod.start)}`
-                    : text.weather.noRain}
+                  {:else}
+                    <span class="text-sm text-muted-foreground">{text.weather.noDryPeriod}</span>
+                  {/each}
                 </div>
               </Card.Content>
             </Card.Root>
 
-            <Card.Root size="sm" class="min-w-0 md:col-span-12">
-              <Card.Header><Card.Title class="text-sm">{text.weather.hourly}</Card.Title></Card.Header>
-              <ScrollArea.Root orientation="horizontal" class="w-full">
-                <Card.Content class="flex w-max min-w-full divide-x px-0 pb-0">
+            <Card.Root size="sm" class="min-w-0 overflow-hidden py-0 md:col-span-12">
+              <div class="px-4 pt-3"><Card.Title class="text-sm">{text.weather.hourly}</Card.Title></div>
+              <ScrollArea.Root orientation="horizontal" class="w-full min-w-0" viewportClass="w-full max-w-full">
+                <div class="flex w-max min-w-full flex-row divide-x px-1 py-2">
                   {#each upcomingHours as hour}
-                    <div class="grid w-28 shrink-0 justify-items-center gap-2 px-3 pb-4 md:w-32">
+                    <div class="grid w-24 shrink-0 grid-cols-2 items-center gap-x-2 gap-y-1 px-3 py-1 md:w-28">
                       <time class="text-xs text-muted-foreground" datetime={hour.time}>{timeLabel(hour.time)}</time>
-                      <WeatherIcon kind={hour.kind} isDay={hour.isDay} class="size-7" />
-                      <strong class="tabular-nums">{Math.round(hour.temperature)}°</strong>
+                      <WeatherIcon kind={hour.kind} isDay={hour.isDay} class="size-6 justify-self-end" />
+                      <strong class="text-sm tabular-nums">{Math.round(hour.temperature)}°</strong>
                       <span class="flex items-center gap-1 text-xs text-muted-foreground"><Droplets class="size-3" />{hour.precipitationProbability}%</span>
-                      <span class="flex items-center gap-1 text-xs text-muted-foreground"><Wind class="size-3" />{Math.round(hour.windSpeed)}</span>
+                      <span class="col-span-2 flex items-center gap-1 text-xs text-muted-foreground"><Wind class="size-3" />{Math.round(hour.windSpeed)} {current.windUnit}</span>
                     </div>
                   {/each}
-                </Card.Content>
+                </div>
               </ScrollArea.Root>
             </Card.Root>
 
@@ -293,55 +272,50 @@
 
       <Tabs.Content value="sky" class="min-h-0 flex-1">
         <ScrollArea.Root class="h-full">
-          <div class="grid gap-3 p-3 md:grid-cols-12 md:gap-4 md:p-6">
-            <Card.Root size="sm" class="md:col-span-5">
-              <Card.Header>
-                <div class="flex items-center justify-between gap-3">
-                  <div>
-                    <Card.Title>{text.weather.tonight}</Card.Title>
-                    <Card.Description>{text.weather.skyExplanation}</Card.Description>
+          <div class="grid auto-rows-max gap-3 p-3 md:grid-cols-12 md:gap-4 md:p-5">
+            <Card.Root size="sm" class="overflow-hidden py-0 md:col-span-12">
+              <Card.Content class="grid gap-0 px-0 md:grid-cols-12">
+                <section class="grid gap-2 border-b p-4 md:col-span-5 md:border-r md:border-b-0">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <Card.Title class="text-sm">{text.weather.tonight}</Card.Title>
+                      <Card.Description class="text-xs">{text.weather.skyExplanation}</Card.Description>
+                    </div>
+                    <CloudMoon class="size-7 text-muted-foreground" />
                   </div>
-                  <CloudMoon class="size-8 text-muted-foreground" />
-                </div>
-              </Card.Header>
-              <Card.Content class="grid gap-3">
-                <div class="flex items-end justify-between gap-4">
-                  <strong class="text-3xl">{skyLabel(averageSkyScore)}</strong>
-                  <span class="text-2xl font-semibold tabular-nums">{averageSkyScore}/100</span>
-                </div>
-                <Progress value={averageSkyScore} />
-                <div class="flex items-center justify-between gap-3 text-sm">
-                  <span class="text-muted-foreground">{text.weather.bestSkyWindow}</span>
-                  <strong>{bestViewingWindow.length > 0 ? `${timeLabel(bestViewingWindow[0].hour.time)}–${windowEndLabel(bestViewingWindow)}` : "--:--"}</strong>
-                </div>
+                  <div class="flex items-end justify-between gap-4">
+                    <strong class="text-2xl">{skyLabel(averageSkyScore)}</strong>
+                    <span class="text-xl font-semibold tabular-nums">{averageSkyScore}/100</span>
+                  </div>
+                  <Progress value={averageSkyScore} />
+                  <div class="flex items-center justify-between gap-3 text-xs">
+                    <span class="text-muted-foreground">{text.weather.bestSkyWindow}</span>
+                    <strong>{bestViewingWindow.length > 0 ? `${timeLabel(bestViewingWindow[0].hour.time)}–${windowEndLabel(bestViewingWindow)}` : "--:--"}</strong>
+                  </div>
+                </section>
+
+                <section class="flex items-center gap-4 border-b p-4 md:col-span-4 md:border-r md:border-b-0">
+                  <Moon class="size-10 shrink-0 text-muted-foreground" />
+                  <div class="min-w-0">
+                    <p class="text-xs font-medium text-muted-foreground">{text.weather.moon}</p>
+                    <strong>{moonLabel(today.moonPhase)}</strong>
+                    <p class="mt-1 text-xs text-muted-foreground">{text.weather.moonrise} {timeLabel(today.moonrise)} · {text.weather.moonset} {timeLabel(today.moonset)}</p>
+                  </div>
+                </section>
+
+                <section class="grid content-center gap-3 p-4 text-sm md:col-span-3">
+                  <span class="flex items-center gap-2"><Sunset class="size-4 text-muted-foreground" /> {text.weather.sunset} {timeLabel(today.sunset)}</span>
+                  <span class="flex items-center gap-2"><Sunrise class="size-4 text-muted-foreground" /> {text.weather.sunrise} {timeLabel(today.sunrise)}</span>
+                </section>
               </Card.Content>
             </Card.Root>
 
-            <Card.Root size="sm" class="md:col-span-4">
-              <Card.Header><Card.Title class="text-sm">{text.weather.moon}</Card.Title></Card.Header>
-              <Card.Content class="flex items-center gap-4">
-                <Moon class="size-12 text-muted-foreground" />
-                <div>
-                  <strong>{moonLabel(today.moonPhase)}</strong>
-                  <p class="mt-1 text-sm text-muted-foreground">{text.weather.moonrise} {timeLabel(today.moonrise)} · {text.weather.moonset} {timeLabel(today.moonset)}</p>
-                </div>
-              </Card.Content>
-            </Card.Root>
-
-            <Card.Root size="sm" class="md:col-span-3">
-              <Card.Header><Card.Title class="text-sm">{text.weather.tonight}</Card.Title></Card.Header>
-              <Card.Content class="grid gap-3 text-sm">
-                <span class="flex items-center gap-2"><Sunset class="size-4 text-muted-foreground" /> {text.weather.sunset} {timeLabel(today.sunset)}</span>
-                <span class="flex items-center gap-2"><Sunrise class="size-4 text-muted-foreground" /> {text.weather.sunrise} {timeLabel(today.sunrise)}</span>
-              </Card.Content>
-            </Card.Root>
-
-            <Card.Root size="sm" class="min-w-0 md:col-span-12">
-              <Card.Header><Card.Title class="text-sm">{text.weather.tonight}</Card.Title></Card.Header>
-              <ScrollArea.Root orientation="horizontal" class="w-full">
-                <Card.Content class="flex w-max min-w-full divide-x px-0 pb-0">
+            <Card.Root size="sm" class="min-w-0 overflow-hidden py-0 md:col-span-12">
+              <div class="px-4 pt-3"><Card.Title class="text-sm">{text.weather.tonight}</Card.Title></div>
+              <ScrollArea.Root orientation="horizontal" class="w-full min-w-0" viewportClass="w-full max-w-full">
+                <div class="flex w-max min-w-full flex-row divide-x px-1 py-2">
                   {#each skyConditions as condition}
-                    <article class="grid w-40 shrink-0 gap-3 px-4 pb-4">
+                    <article class="grid w-36 shrink-0 gap-2 px-3 py-1">
                       <div class="flex items-center justify-between">
                         <time class="font-medium tabular-nums" datetime={condition.hour.time}>{timeLabel(condition.hour.time)}</time>
                         <Badge variant="outline">{condition.score}</Badge>
@@ -352,14 +326,30 @@
                         <span class="flex items-center gap-1"><Droplets class="size-3.5" />{condition.hour.humidity}%</span>
                         <span class="flex items-center gap-1"><Wind class="size-3.5" />{Math.round(condition.hour.windGusts)}</span>
                       </div>
-                      <div class="grid gap-1 text-xs">
-                        <span class="flex justify-between"><span>{text.weather.lowClouds}</span><strong>{condition.hour.cloudCoverLow}%</strong></span>
-                        <span class="flex justify-between"><span>{text.weather.midClouds}</span><strong>{condition.hour.cloudCoverMid}%</strong></span>
-                        <span class="flex justify-between"><span>{text.weather.highClouds}</span><strong>{condition.hour.cloudCoverHigh}%</strong></span>
+                      <div class="flex justify-between gap-2 text-xs">
+                        <span title={text.weather.lowClouds}>L <strong>{condition.hour.cloudCoverLow}%</strong></span>
+                        <span title={text.weather.midClouds}>M <strong>{condition.hour.cloudCoverMid}%</strong></span>
+                        <span title={text.weather.highClouds}>H <strong>{condition.hour.cloudCoverHigh}%</strong></span>
                       </div>
                     </article>
                   {/each}
-                </Card.Content>
+                </div>
+              </ScrollArea.Root>
+            </Card.Root>
+
+            <Card.Root size="sm" class="min-w-0 overflow-hidden py-0 md:col-span-12">
+              <div class="px-4 pt-3"><Card.Title class="text-sm">{text.weather.upcomingNights}</Card.Title></div>
+              <ScrollArea.Root orientation="horizontal" class="w-full min-w-0" viewportClass="w-full max-w-full">
+                <div class="flex w-max min-w-full flex-row divide-x px-1 py-2">
+                  {#each nightSummaries as summary}
+                    <div class="grid w-32 shrink-0 grid-cols-[1fr_auto] items-center gap-x-2 gap-y-1 px-3 py-1 md:flex-1">
+                      <strong class="truncate text-sm">{dayLabel(summary.day.time)}</strong>
+                      <WeatherIcon kind={summary.day.kind} isDay={false} class="size-5" />
+                      <span class="text-xs text-muted-foreground">{moonLabel(summary.day.moonPhase)}</span>
+                      <Badge variant="outline" class="justify-self-end">{summary.score}</Badge>
+                    </div>
+                  {/each}
+                </div>
               </ScrollArea.Root>
             </Card.Root>
 
