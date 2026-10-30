@@ -73,8 +73,9 @@ Current deliberate limits:
   checklist or reduce tomorrow's progress.
 - A chore resolves to its latest scheduled occurrence. If it is still pending
   after that date, it remains visible as overdue.
-- Resolving an overdue chore counts toward the day it was actually completed or
-  skipped. It disappears on the following day until its next scheduled occurrence.
+- Resolving an overdue chore records the day it was actually completed or skipped,
+  but does not change progress for tasks scheduled today. It disappears on the
+  following day until its next scheduled occurrence.
 - Completing an occurrence counts toward progress. Skipping preserves the state
   for history and synchronization but removes it from the progress denominator.
 - Reopening a completed or skipped occurrence returns that same occurrence to

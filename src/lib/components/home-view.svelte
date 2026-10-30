@@ -130,7 +130,10 @@
   );
   let progressTasks = $derived(
     tasks.filter(
-      (task) => visibleProfileIds.has(task.profileId) && !task.skipped,
+      (task) =>
+        visibleProfileIds.has(task.profileId) &&
+        task.occurrenceDate === todayKey &&
+        !task.skipped,
     ),
   );
   let completedTaskCount = $derived(
@@ -330,6 +333,13 @@
         : text.tasks[task.dayPart];
     }
     return task.dueTime?.slice(0, 5) ?? text.tasks.now;
+  }
+
+  function openTaskContext(task: DailyTask) {
+    if (task.kind === "routine" && task.dayPart) {
+      return text.tasks[task.dayPart];
+    }
+    return task.dueTime?.slice(0, 5) ?? text.tasks.chore;
   }
 
   async function loadCalendar(showLoader = false) {
@@ -679,7 +689,7 @@
                   <span class="min-w-0">
                     <strong class="block truncate text-sm">{task.title}</strong>
                     <span class="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
-                      {taskTime(task)}
+                      {openTaskContext(task)}
                       {#if profile} · {profile.name}{/if}
                     </span>
                   </span>
