@@ -162,12 +162,25 @@
       })
       .filter((entry) => entry.total > 0),
   );
+  let openTasks = $derived(
+    tasks.filter(
+      (task) =>
+        task.status === "pending" &&
+        visibleProfileIds.has(task.profileId) &&
+        taskIsOpen(task, dayPart),
+    ).sort((first, second) => {
+      return (
+        taskSortMinutes(first, dayPart) - taskSortMinutes(second, dayPart) ||
+        first.title.localeCompare(second.title)
+      );
+    }),
+  );
   let visibleTasks = $derived(
     tasks.filter(
       (task) =>
         task.status === "pending" &&
         visibleProfileIds.has(task.profileId) &&
-        taskIsCurrentOrUpcoming(task, dayPart),
+        !taskIsOpen(task, dayPart),
     ).sort((first, second) => {
       return (
         taskSortMinutes(first, dayPart) - taskSortMinutes(second, dayPart) ||
@@ -255,8 +268,14 @@
       : null;
   }
 
-  function taskIsCurrentOrUpcoming(task: DailyTask, window: DayPartWindow) {
-    return task.occurrenceDate <= todayKey && window.dayEnd > now;
+  function taskIsOpen(task: DailyTask, window: DayPartWindow) {
+    if (task.overdue) return true;
+    if (task.kind === "routine") {
+      return dayPartStartMinutes(task.dayPart) < window.startMinutes;
+    }
+
+    const dueMinutes = dueTimeMinutes(task.dueTime);
+    return dueMinutes !== null && dueMinutes < window.currentMinutes;
   }
 
   function taskSortMinutes(task: DailyTask, window: DayPartWindow) {
@@ -470,11 +489,11 @@
   </Card.Root>
 
   <div
-    class="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-3 md:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)] md:grid-rows-1 md:gap-4"
+    class={`grid min-h-0 flex-1 gap-3 md:grid-rows-1 md:gap-4 ${openTasks.length > 0 ? "grid-rows-[auto_auto_minmax(20rem,1fr)] md:grid-cols-[minmax(0,3fr)_minmax(14rem,2fr)_minmax(14rem,2fr)]" : "grid-rows-[auto_minmax(0,1fr)] md:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]"}`}
   >
     <Card.Root
       size="sm"
-      class="order-2 min-h-0 overflow-hidden py-0 md:order-1"
+      class="order-3 min-h-0 overflow-hidden py-0 md:order-1"
     >
       <Card.Header class="border-b py-3">
         <div class="flex items-center justify-between gap-3">
@@ -616,7 +635,66 @@
       </ScrollArea.Root>
     </Card.Root>
 
-  <Card.Root size="sm" class="order-1 shrink-0 py-0 md:order-2 md:min-h-0 md:overflow-hidden">
+    {#if openTasks.length > 0}
+      <Card.Root
+        size="sm"
+        class="order-2 min-h-0 overflow-hidden py-0 md:order-2"
+      >
+        <Card.Header class="border-b py-3">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex min-w-0 items-center gap-2.5">
+              <ListChecks
+                class="size-4 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <div class="min-w-0">
+                <Card.Title class="text-sm">{text.home.openItems}</Card.Title>
+                <Card.Description class="text-xs">
+                  {text.home.openItemsDescription}
+                </Card.Description>
+              </div>
+            </div>
+            <Badge variant="secondary" class="tabular-nums">
+              {openTasks.length}
+            </Badge>
+          </div>
+        </Card.Header>
+
+        <ScrollArea.Root class="min-h-0 flex-1">
+          <Card.Content class="grid gap-2 py-3">
+            {#each openTasks as task (`open-${task.id}-${task.profileId}-${task.occurrenceDate}`)}
+              {@const profile = profileForTask(task)}
+              {@const completionKey = `${task.id}:${task.profileId}:${task.occurrenceDate}`}
+              <label class="grid min-h-14 cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border bg-background px-3 py-2 transition-colors hover:bg-accent/50">
+                <Checkbox
+                  checked={false}
+                  disabled={pendingCompletions.includes(completionKey)}
+                  onCheckedChange={(checked) => {
+                    if (checked === true) void completeTask(task);
+                  }}
+                  aria-label={`${task.title} ${text.tasks.completed}`}
+                />
+                <span class="flex min-w-0 items-center gap-2.5">
+                  <span class="text-lg" aria-hidden="true">{task.emoji || "✓"}</span>
+                  <span class="min-w-0">
+                    <strong class="block truncate text-sm">{task.title}</strong>
+                    <span class="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                      {taskTime(task)}
+                      {#if profile} · {profile.name}{/if}
+                    </span>
+                  </span>
+                </span>
+                {#if profile}
+                  <ProfileAvatar name={profile.name} color={profile.color} size="sm" />
+                {/if}
+              </label>
+            {/each}
+          </Card.Content>
+        </ScrollArea.Root>
+      </Card.Root>
+    {/if}
+
+  <Card.Root size="sm" class="order-1 shrink-0 py-0 md:order-3 md:min-h-0 md:overflow-hidden">
     <Card.Header class="border-b py-3">
       <div class="flex items-center gap-2.5">
         <ChartNoAxesColumnIncreasing class="size-4 text-muted-foreground" aria-hidden="true" />
