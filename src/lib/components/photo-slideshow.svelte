@@ -51,9 +51,45 @@
     }).format(now),
   );
 
+  function shuffledPhotos(
+    source: HouseholdPhoto[],
+    avoidFirstId?: string,
+  ) {
+    const shuffled = [...source];
+
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const randomIndex = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[randomIndex]] = [
+        shuffled[randomIndex],
+        shuffled[index],
+      ];
+    }
+
+    if (
+      avoidFirstId &&
+      shuffled.length > 1 &&
+      shuffled[0]?.id === avoidFirstId
+    ) {
+      const swapIndex = 1 + Math.floor(Math.random() * (shuffled.length - 1));
+      [shuffled[0], shuffled[swapIndex]] = [
+        shuffled[swapIndex],
+        shuffled[0],
+      ];
+    }
+
+    return shuffled;
+  }
+
   function advancePhoto() {
     if (photos.length < 2) return;
-    currentIndex = (currentIndex + 1) % photos.length;
+    if (currentIndex < photos.length - 1) {
+      currentIndex += 1;
+      return;
+    }
+
+    const previousPhotoId = photos[currentIndex]?.id;
+    photos = shuffledPhotos(photos, previousPhotoId);
+    currentIndex = 0;
   }
 
   async function loadPhotos() {
@@ -63,8 +99,28 @@
     loadError = "";
 
     try {
-      photos = await getHouseholdPhotos(session.household.id);
-      if (currentIndex >= photos.length) currentIndex = 0;
+      const loadedPhotos = await getHouseholdPhotos(session.household.id);
+      const currentPhotoId = photos[currentIndex]?.id;
+      const loadedById = new Map(
+        loadedPhotos.map((photo) => [photo.id, photo]),
+      );
+      const samePhotoSet =
+        photos.length === loadedPhotos.length &&
+        photos.every((photo) => loadedById.has(photo.id));
+
+      if (samePhotoSet) {
+        photos = photos.map((photo) => loadedById.get(photo.id) ?? photo);
+      } else if (currentPhotoId && loadedById.has(currentPhotoId)) {
+        const activePhoto = loadedById.get(currentPhotoId);
+        const remainingPhotos = shuffledPhotos(
+          loadedPhotos.filter((photo) => photo.id !== currentPhotoId),
+        );
+        photos = activePhoto ? [activePhoto, ...remainingPhotos] : remainingPhotos;
+        currentIndex = 0;
+      } else {
+        photos = shuffledPhotos(loadedPhotos);
+        currentIndex = 0;
+      }
     } catch (error) {
       console.error("Unable to load photo slideshow", error);
       loadError = text.photos.loadErrorDescription;
