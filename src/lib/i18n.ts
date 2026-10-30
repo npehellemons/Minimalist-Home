@@ -27,6 +27,11 @@ export const translations = {
     home: {
       tasks: "Taken voor nu",
       calendar: "Agenda voor nu",
+      timeline: "Nu en straks",
+      tasksShort: "Taken",
+      calendarShort: "Agenda-items",
+      allClear: "Alles is bijgewerkt",
+      noTimeline: "Voor dit dagdeel staat niets meer gepland.",
       noTasks: "Geen openstaande taken voor dit dagdeel.",
       noCalendar: "Geen agenda-items meer voor dit dagdeel.",
       calendarLoadError: "Agenda kon niet worden geladen",
@@ -340,6 +345,11 @@ export const translations = {
     home: {
       tasks: "Tasks for now",
       calendar: "Calendar for now",
+      timeline: "Now and next",
+      tasksShort: "Tasks",
+      calendarShort: "Calendar events",
+      allClear: "You're all caught up",
+      noTimeline: "Nothing else is scheduled for this part of the day.",
       noTasks: "No open tasks for this time of day.",
       noCalendar: "No calendar events left for this time of day.",
       calendarLoadError: "Calendar could not be loaded",

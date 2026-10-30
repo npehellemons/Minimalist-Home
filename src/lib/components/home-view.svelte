@@ -1,8 +1,10 @@
 <script lang="ts">
   import {
     CalendarDays,
+    Clock3,
     Droplets,
     ListChecks,
+    MapPin,
     Repeat2,
     Wind,
   } from "@lucide/svelte";
@@ -50,9 +52,24 @@
     end: Date;
     startMinutes: number;
     endMinutes: number;
+    currentMinutes: number;
     dayStart: Date;
     dayEnd: Date;
   };
+
+  type TimelineItem =
+    | {
+        kind: "task";
+        key: string;
+        sortMinutes: number;
+        task: DailyTask;
+      }
+    | {
+        kind: "event";
+        key: string;
+        sortMinutes: number;
+        event: HouseholdCalendarEvent;
+      };
 
   let calendarEvents = $state<HouseholdCalendarEvent[]>([]);
   let calendarLoading = $state(true);
@@ -130,6 +147,40 @@
         event.start < dayPart.end,
     ),
   );
+  let timelineItems = $derived.by(() => {
+    const taskItems: TimelineItem[] = visibleTasks.map((task) => {
+      const [hours, minutes] = task.dueTime?.split(":").map(Number) ?? [];
+      const sortMinutes = Number.isFinite(hours) && Number.isFinite(minutes)
+        ? hours * 60 + minutes
+        : dayPart.currentMinutes - 1;
+
+      return {
+        kind: "task",
+        key: `task:${task.id}:${task.profileId}`,
+        sortMinutes,
+        task,
+      };
+    });
+    const eventItems: TimelineItem[] = visibleEvents.map((event) => {
+      const eventStart = Temporal.Instant.fromEpochMilliseconds(
+        event.start.getTime(),
+      ).toZonedDateTimeISO($appSettings.location.timezone);
+
+      return {
+        kind: "event",
+        key: `event:${event.id}`,
+        sortMinutes: event.start <= now
+          ? dayPart.currentMinutes - 2
+          : eventStart.hour * 60 + eventStart.minute,
+        event,
+      };
+    });
+
+    return [...taskItems, ...eventItems].sort(
+      (first, second) =>
+        first.sortMinutes - second.sortMinutes || first.key.localeCompare(second.key),
+    );
+  });
 
   function currentDayPart(date: Date, timeZone: string): DayPartWindow {
     const zonedNow = Temporal.Instant.fromEpochMilliseconds(
@@ -152,6 +203,7 @@
       end: new Date(dayStart.add({ hours: endHours }).epochMilliseconds),
       startMinutes: startHours * 60,
       endMinutes: endHours * 60,
+      currentMinutes: zonedNow.hour * 60 + zonedNow.minute,
       dayStart: new Date(dayStart.epochMilliseconds),
       dayEnd: new Date(dayEnd.epochMilliseconds),
     };
@@ -183,6 +235,14 @@
       },
     );
     return `${formatter.format(event.start)}–${formatter.format(event.end)}`;
+  }
+
+  function eventIsOngoing(event: HouseholdCalendarEvent) {
+    return !event.allDay && event.start <= now && event.end > now;
+  }
+
+  function taskTime(task: DailyTask) {
+    return task.dueTime?.slice(0, 5) ?? text.tasks.now;
   }
 
   async function loadCalendar(showLoader = false) {
@@ -340,47 +400,75 @@
     </ScrollArea.Root>
   </Card.Root>
 
-  <div class="grid min-h-0 flex-1 gap-3 md:grid-cols-2 md:gap-4">
-    <Card.Root size="sm" class="min-h-0">
-      <Card.Header class="border-b">
-        <div class="flex items-center justify-between gap-3">
-          <div class="flex min-w-0 items-center gap-2.5">
-            <ListChecks class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <div class="min-w-0">
-              <Card.Title class="text-sm">{text.home.tasks}</Card.Title>
-              <Card.Description class="text-xs">{text.tasks[dayPart.id]}</Card.Description>
+  <Card.Root size="sm" class="min-h-0 flex-1 overflow-hidden py-0">
+    <Card.Header class="border-b py-3">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex min-w-0 items-center gap-2.5">
+          <Clock3 class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <div class="min-w-0">
+            <Card.Title class="text-sm">{text.home.timeline}</Card.Title>
+            <Card.Description class="text-xs">{text.tasks[dayPart.id]}</Card.Description>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <Badge variant="secondary" class="gap-1">
+            <ListChecks class="size-3" aria-hidden="true" />
+            {visibleTasks.length}
+            <span class="sr-only">{text.home.tasksShort}</span>
+          </Badge>
+          <Badge variant="secondary" class="gap-1">
+            <CalendarDays class="size-3" aria-hidden="true" />
+            {visibleEvents.length}
+            <span class="sr-only">{text.home.calendarShort}</span>
+          </Badge>
+        </div>
+      </div>
+    </Card.Header>
+
+    <ScrollArea.Root class="min-h-0 flex-1">
+      <Card.Content class="grid gap-2 py-3">
+        {#if tasksError}
+          <Alert.Root variant="destructive">
+            <Alert.Title>{text.tasks.loadError}</Alert.Title>
+            <Alert.Description>{tasksError}</Alert.Description>
+          </Alert.Root>
+        {/if}
+        {#if calendarError}
+          <Alert.Root variant="destructive">
+            <Alert.Title>{text.home.calendarLoadError}</Alert.Title>
+            <Alert.Description>{calendarError}</Alert.Description>
+          </Alert.Root>
+        {/if}
+
+        {#if (tasksLoading || calendarLoading) && timelineItems.length === 0}
+          {#each Array(4) as _}
+            <div class="flex items-center gap-3 rounded-md border p-3">
+              <Skeleton class="h-4 w-14" />
+              <Skeleton class="size-5 rounded-sm" />
+              <div class="grid flex-1 gap-2">
+                <Skeleton class="h-4 w-2/3" />
+                <Skeleton class="h-3 w-1/3" />
+              </div>
+            </div>
+          {/each}
+        {:else if timelineItems.length === 0 && !tasksError && !calendarError}
+          <div class="grid min-h-48 place-items-center text-center">
+            <div>
+              <Clock3 class="mx-auto mb-3 size-6 text-muted-foreground" aria-hidden="true" />
+              <p class="text-sm font-medium">{text.home.allClear}</p>
+              <p class="mt-1 text-xs text-muted-foreground">{text.home.noTimeline}</p>
             </div>
           </div>
-          <Badge variant="secondary">{visibleTasks.length}</Badge>
-        </div>
-      </Card.Header>
-
-      <ScrollArea.Root class="max-h-[19rem] min-h-0 flex-1 md:max-h-none">
-        <Card.Content class="grid gap-2">
-          {#if tasksLoading}
-            {#each Array(3) as _}
-              <div class="flex items-center gap-3 rounded-lg border p-3">
-                <Skeleton class="size-5 rounded-sm" />
-                <div class="grid flex-1 gap-2">
-                  <Skeleton class="h-4 w-2/3" />
-                  <Skeleton class="h-3 w-1/3" />
-                </div>
-              </div>
-            {/each}
-          {:else if tasksError}
-            <Alert.Root variant="destructive">
-              <Alert.Title>{text.tasks.loadError}</Alert.Title>
-              <Alert.Description>{tasksError}</Alert.Description>
-            </Alert.Root>
-          {:else if visibleTasks.length === 0}
-            <p class="py-12 text-center text-sm text-muted-foreground">
-              {text.home.noTasks}
-            </p>
-          {:else}
-            {#each visibleTasks as task (`${task.id}:${task.profileId}`)}
+        {:else}
+          {#each timelineItems as item (item.key)}
+            {#if item.kind === "task"}
+              {@const task = item.task}
               {@const profile = profileForTask(task)}
               {@const completionKey = `${task.id}:${task.profileId}`}
-              <label class="flex min-h-16 cursor-pointer items-center gap-3 rounded-lg border bg-background p-3 transition-colors hover:bg-accent/50">
+              <label class="grid min-h-14 cursor-pointer grid-cols-[4rem_auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border bg-background px-3 py-2 transition-colors hover:bg-accent/50">
+                <time class="text-xs font-medium tabular-nums text-muted-foreground">
+                  {taskTime(task)}
+                </time>
                 <Checkbox
                   checked={false}
                   disabled={pendingCompletions.includes(completionKey)}
@@ -389,82 +477,50 @@
                   }}
                   aria-label={`${task.title} ${text.tasks.completed}`}
                 />
-                <span class="text-xl" aria-hidden="true">{task.emoji || "✓"}</span>
-                <span class="min-w-0 flex-1">
-                  <strong class="block truncate text-sm">{task.title}</strong>
-                  <span class="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                    {#if task.kind === "routine"}
-                      <Repeat2 class="size-3" aria-hidden="true" />
-                      {text.tasks.routine}
-                    {:else}
-                      <ListChecks class="size-3" aria-hidden="true" />
-                      {task.dueTime?.slice(0, 5) ?? text.tasks.chore}
-                    {/if}
-                    {#if profile}
-                      · {profile.name}
-                    {/if}
+                <span class="flex min-w-0 items-center gap-2.5">
+                  <span class="text-lg" aria-hidden="true">{task.emoji || "✓"}</span>
+                  <span class="min-w-0">
+                    <strong class="block truncate text-sm">{task.title}</strong>
+                    <span class="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                      {#if task.kind === "routine"}
+                        <Repeat2 class="size-3 shrink-0" aria-hidden="true" />
+                        {text.tasks.routine}
+                      {:else}
+                        <ListChecks class="size-3 shrink-0" aria-hidden="true" />
+                        {text.tasks.chore}
+                      {/if}
+                      {#if profile} · {profile.name}{/if}
+                    </span>
                   </span>
                 </span>
                 {#if profile}
                   <ProfileAvatar name={profile.name} color={profile.color} size="sm" />
                 {/if}
               </label>
-            {/each}
-          {/if}
-        </Card.Content>
-      </ScrollArea.Root>
-    </Card.Root>
-
-    <Card.Root size="sm" class="min-h-0">
-      <Card.Header class="border-b">
-        <div class="flex items-center justify-between gap-3">
-          <div class="flex min-w-0 items-center gap-2.5">
-            <CalendarDays class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <div class="min-w-0">
-              <Card.Title class="text-sm">{text.home.calendar}</Card.Title>
-              <Card.Description class="text-xs">{text.tasks[dayPart.id]}</Card.Description>
-            </div>
-          </div>
-          <Badge variant="secondary">{visibleEvents.length}</Badge>
-        </div>
-      </Card.Header>
-
-      <ScrollArea.Root class="max-h-[19rem] min-h-0 flex-1 md:max-h-none">
-        <Card.Content class="grid gap-2">
-          {#if calendarLoading}
-            {#each Array(3) as _}
-              <div class="flex items-center gap-3 rounded-lg border p-3">
-                <Skeleton class="h-10 w-14" />
-                <div class="grid flex-1 gap-2">
-                  <Skeleton class="h-4 w-2/3" />
-                  <Skeleton class="h-3 w-1/3" />
-                </div>
-              </div>
-            {/each}
-          {:else if calendarError}
-            <Alert.Root variant="destructive">
-              <Alert.Title>{text.home.calendarLoadError}</Alert.Title>
-              <Alert.Description>{calendarError}</Alert.Description>
-            </Alert.Root>
-          {:else if visibleEvents.length === 0}
-            <p class="py-12 text-center text-sm text-muted-foreground">
-              {text.home.noCalendar}
-            </p>
-          {:else}
-            {#each visibleEvents as event (event.id)}
-              <div class="flex min-h-16 items-center gap-3 rounded-lg border bg-background p-3">
-                <div class="w-20 shrink-0 text-xs font-medium text-muted-foreground">
-                  {eventTime(event)}
+            {:else}
+              {@const event = item.event}
+              <div class="grid min-h-14 grid-cols-[4rem_auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border bg-background px-3 py-2">
+                <div class="min-w-0 text-xs font-medium text-muted-foreground">
+                  {#if eventIsOngoing(event)}
+                    <Badge variant="secondary" class="px-1.5 py-0">{text.tasks.now}</Badge>
+                  {:else}
+                    <span class="tabular-nums">{eventTime(event)}</span>
+                  {/if}
                 </div>
                 <span
-                  class="h-10 w-1 shrink-0 rounded-full"
+                  class="h-8 w-1 shrink-0 rounded-full"
                   style:background-color={event.profileColor}
                   aria-hidden="true"
                 ></span>
-                <div class="min-w-0 flex-1">
+                <div class="min-w-0">
                   <strong class="block truncate text-sm">{event.title}</strong>
-                  <span class="mt-1 block truncate text-xs text-muted-foreground">
-                    {event.profileName} · {event.calendarName}
+                  <span class="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                    <CalendarDays class="size-3 shrink-0" aria-hidden="true" />
+                    {eventIsOngoing(event) ? `${eventTime(event)} · ` : ""}{event.profileName} · {event.calendarName}
+                    {#if event.location}
+                      <MapPin class="ml-1 size-3 shrink-0" aria-hidden="true" />
+                      {event.location}
+                    {/if}
                   </span>
                 </div>
                 <ProfileAvatar
@@ -473,10 +529,10 @@
                   size="sm"
                 />
               </div>
-            {/each}
-          {/if}
-        </Card.Content>
-      </ScrollArea.Root>
-    </Card.Root>
-  </div>
+            {/if}
+          {/each}
+        {/if}
+      </Card.Content>
+    </ScrollArea.Root>
+  </Card.Root>
 </div>
