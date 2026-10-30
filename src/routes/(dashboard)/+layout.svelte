@@ -227,11 +227,11 @@
             </Sidebar.Content>
           </Sidebar.Root>
 
-          <Sidebar.Inset class="min-h-0 min-w-0 overflow-hidden pb-16 md:pb-0">
+          <Sidebar.Inset class="min-h-0 min-w-0 overflow-hidden pb-[var(--mobile-nav-height)] md:pb-0">
             {@render children()}
           </Sidebar.Inset>
 
-          <div class="absolute inset-x-0 bottom-0 z-20 grid h-16 grid-cols-5 border-t bg-background/95 backdrop-blur md:hidden">
+          <div class="absolute inset-x-0 bottom-0 z-20 grid h-[var(--mobile-nav-height)] grid-cols-5 border-t bg-background/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur md:hidden">
             <Tabs.List
               variant="line"
               class="col-span-4 grid h-16 w-full grid-cols-4 rounded-none bg-transparent p-0 group-data-horizontal/tabs:h-16"
