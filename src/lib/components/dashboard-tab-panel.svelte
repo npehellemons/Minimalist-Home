@@ -19,7 +19,7 @@
     <div
       {...props}
       role="tabpanel"
-      class="absolute inset-0 h-full w-full overflow-hidden text-sm outline-none"
+      class="absolute inset-x-0 top-0 bottom-[var(--mobile-nav-height)] w-full overflow-hidden text-sm outline-none md:bottom-0"
       hidden={undefined}
       aria-hidden={!active}
       inert={!active}

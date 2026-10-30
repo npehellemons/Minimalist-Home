@@ -227,7 +227,7 @@
             </Sidebar.Content>
           </Sidebar.Root>
 
-          <Sidebar.Inset class="min-h-0 min-w-0 overflow-hidden pb-[var(--mobile-nav-height)] md:pb-0">
+          <Sidebar.Inset class="min-h-0 min-w-0 overflow-hidden">
             {@render children()}
           </Sidebar.Inset>
 
