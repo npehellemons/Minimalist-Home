@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     CalendarDays,
+    ChartNoAxesColumnIncreasing,
     Clock3,
     Droplets,
     ListChecks,
@@ -26,6 +27,7 @@
   import { Badge } from "#lib/components/ui/badge/index.js";
   import * as Card from "#lib/components/ui/card/index.js";
   import { Checkbox } from "#lib/components/ui/checkbox/index.js";
+  import { Progress } from "#lib/components/ui/progress/index.js";
   import * as ScrollArea from "#lib/components/ui/scroll-area/index.js";
   import { Skeleton } from "#lib/components/ui/skeleton/index.js";
   import WeatherIcon from "#lib/components/weather-icon.svelte";
@@ -126,16 +128,49 @@
   let profileById = $derived(
     new Map($appSettings.profiles.map((profile) => [profile.id, profile])),
   );
+  let progressTasks = $derived(
+    tasks.filter((task) => visibleProfileIds.has(task.profileId)),
+  );
+  let completedTaskCount = $derived(
+    progressTasks.filter((task) => task.completed).length,
+  );
+  let completionPercentage = $derived(
+    progressTasks.length > 0
+      ? Math.round((completedTaskCount / progressTasks.length) * 100)
+      : 0,
+  );
+  let profileProgress = $derived.by(() =>
+    $appSettings.profiles
+      .filter((profile) => visibleProfileIds.has(profile.id))
+      .map((profile) => {
+        const profileTasks = progressTasks.filter(
+          (task) => task.profileId === profile.id,
+        );
+        const completed = profileTasks.filter((task) => task.completed).length;
+
+        return {
+          profile,
+          completed,
+          total: profileTasks.length,
+          percentage:
+            profileTasks.length > 0
+              ? Math.round((completed / profileTasks.length) * 100)
+              : 0,
+        };
+      })
+      .filter((entry) => entry.total > 0),
+  );
   let visibleTasks = $derived(
     tasks.filter(
       (task) =>
         !task.completed &&
         visibleProfileIds.has(task.profileId) &&
-        taskBelongsToDayPart(task, dayPart),
+        taskIsCurrentOrUpcoming(task, dayPart),
     ).sort((first, second) => {
-      const firstTime = first.dueTime ?? "99:99";
-      const secondTime = second.dueTime ?? "99:99";
-      return firstTime.localeCompare(secondTime) || first.title.localeCompare(second.title);
+      return (
+        taskSortMinutes(first, dayPart) - taskSortMinutes(second, dayPart) ||
+        first.title.localeCompare(second.title)
+      );
     }),
   );
   let visibleEvents = $derived(
@@ -143,21 +178,15 @@
       (event) =>
         visibleProfileIds.has(event.profileId) &&
         event.end > now &&
-        event.end > dayPart.start &&
-        event.start < dayPart.end,
+        event.start < dayPart.dayEnd,
     ),
   );
   let timelineItems = $derived.by(() => {
     const taskItems: TimelineItem[] = visibleTasks.map((task) => {
-      const [hours, minutes] = task.dueTime?.split(":").map(Number) ?? [];
-      const sortMinutes = Number.isFinite(hours) && Number.isFinite(minutes)
-        ? hours * 60 + minutes
-        : dayPart.currentMinutes - 1;
-
       return {
         kind: "task",
         key: `task:${task.id}:${task.profileId}`,
-        sortMinutes,
+        sortMinutes: taskSortMinutes(task, dayPart),
         task,
       };
     });
@@ -209,13 +238,39 @@
     };
   }
 
-  function taskBelongsToDayPart(task: DailyTask, window: DayPartWindow) {
-    if (task.kind === "routine") return task.dayPart === window.id;
-    if (!task.dueTime) return true;
+  function dayPartStartMinutes(dayPart: TaskDayPart | null) {
+    if (dayPart === "afternoon") return 12 * 60;
+    if (dayPart === "evening") return 18 * 60;
+    return 0;
+  }
 
-    const [hours, minutes] = task.dueTime.split(":").map(Number);
-    const dueMinutes = hours * 60 + minutes;
-    return dueMinutes >= window.startMinutes && dueMinutes < window.endMinutes;
+  function dueTimeMinutes(dueTime: string | null) {
+    if (!dueTime) return null;
+
+    const [hours, minutes] = dueTime.split(":").map(Number);
+    return Number.isFinite(hours) && Number.isFinite(minutes)
+      ? hours * 60 + minutes
+      : null;
+  }
+
+  function taskIsCurrentOrUpcoming(task: DailyTask, window: DayPartWindow) {
+    if (task.kind !== "routine") return true;
+    return dayPartStartMinutes(task.dayPart) >= window.startMinutes;
+  }
+
+  function taskSortMinutes(task: DailyTask, window: DayPartWindow) {
+    if (task.kind === "routine") {
+      const startMinutes = dayPartStartMinutes(task.dayPart);
+      return startMinutes === window.startMinutes
+        ? window.currentMinutes - 1
+        : startMinutes;
+    }
+
+    const dueMinutes = dueTimeMinutes(task.dueTime);
+    if (dueMinutes === null || dueMinutes <= window.currentMinutes) {
+      return window.currentMinutes - 1;
+    }
+    return dueMinutes;
   }
 
   function profileForTask(task: DailyTask): HouseholdProfile | undefined {
@@ -242,6 +297,13 @@
   }
 
   function taskTime(task: DailyTask) {
+    if (
+      task.kind === "routine" &&
+      task.dayPart &&
+      task.dayPart !== dayPart.id
+    ) {
+      return text.tasks[task.dayPart];
+    }
     return task.dueTime?.slice(0, 5) ?? text.tasks.now;
   }
 
@@ -400,32 +462,43 @@
     </ScrollArea.Root>
   </Card.Root>
 
-  <Card.Root size="sm" class="min-h-0 flex-1 overflow-hidden py-0">
-    <Card.Header class="border-b py-3">
-      <div class="flex items-center justify-between gap-3">
-        <div class="flex min-w-0 items-center gap-2.5">
-          <Clock3 class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <div class="min-w-0">
-            <Card.Title class="text-sm">{text.home.timeline}</Card.Title>
-            <Card.Description class="text-xs">{text.tasks[dayPart.id]}</Card.Description>
+  <div
+    class="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-3 md:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)] md:grid-rows-1 md:gap-4"
+  >
+    <Card.Root
+      size="sm"
+      class="order-2 min-h-0 overflow-hidden py-0 md:order-1"
+    >
+      <Card.Header class="border-b py-3">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex min-w-0 items-center gap-2.5">
+            <Clock3
+              class="size-4 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <div class="min-w-0">
+              <Card.Title class="text-sm">{text.home.timeline}</Card.Title>
+              <Card.Description class="text-xs">
+                {text.tasks[dayPart.id]} · {text.home.restOfToday}
+              </Card.Description>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <Badge variant="secondary" class="gap-1">
+              <ListChecks class="size-3" aria-hidden="true" />
+              {visibleTasks.length}
+              <span class="sr-only">{text.home.tasksShort}</span>
+            </Badge>
+            <Badge variant="secondary" class="gap-1">
+              <CalendarDays class="size-3" aria-hidden="true" />
+              {visibleEvents.length}
+              <span class="sr-only">{text.home.calendarShort}</span>
+            </Badge>
           </div>
         </div>
-        <div class="flex items-center gap-2">
-          <Badge variant="secondary" class="gap-1">
-            <ListChecks class="size-3" aria-hidden="true" />
-            {visibleTasks.length}
-            <span class="sr-only">{text.home.tasksShort}</span>
-          </Badge>
-          <Badge variant="secondary" class="gap-1">
-            <CalendarDays class="size-3" aria-hidden="true" />
-            {visibleEvents.length}
-            <span class="sr-only">{text.home.calendarShort}</span>
-          </Badge>
-        </div>
-      </div>
-    </Card.Header>
+      </Card.Header>
 
-    <ScrollArea.Root class="min-h-0 flex-1">
+      <ScrollArea.Root class="min-h-0 flex-1">
       <Card.Content class="grid gap-2 py-3">
         {#if tasksError}
           <Alert.Root variant="destructive">
@@ -533,6 +606,68 @@
           {/each}
         {/if}
       </Card.Content>
-    </ScrollArea.Root>
-  </Card.Root>
+      </ScrollArea.Root>
+    </Card.Root>
+
+  <Card.Root size="sm" class="order-1 shrink-0 py-0 md:order-2 md:min-h-0 md:overflow-hidden">
+    <Card.Header class="border-b py-3">
+      <div class="flex items-center gap-2.5">
+        <ChartNoAxesColumnIncreasing class="size-4 text-muted-foreground" aria-hidden="true" />
+        <div>
+          <Card.Title class="text-sm">{text.home.progress}</Card.Title>
+          <Card.Description class="text-xs">{text.home.today}</Card.Description>
+        </div>
+      </div>
+    </Card.Header>
+    <Card.Content class="grid gap-3 py-3 md:gap-5 md:py-5">
+      {#if tasksLoading && progressTasks.length === 0}
+        <Skeleton class="h-16 w-full" />
+      {:else}
+        <div class="grid gap-2">
+          <div class="flex items-end justify-between gap-3">
+            <strong class="text-3xl leading-none tabular-nums">{completionPercentage}%</strong>
+            <span class="text-xs text-muted-foreground">
+              {completedTaskCount} / {progressTasks.length} {text.home.completed}
+            </span>
+          </div>
+          <Progress
+            value={completionPercentage}
+            class="h-2"
+            aria-label={text.home.progress}
+          />
+        </div>
+
+        <div class="hidden gap-4 md:grid">
+          {#if profileProgress.length > 0}
+            {#each profileProgress as entry (entry.profile.id)}
+              <div class="grid gap-2">
+                <div class="flex items-center gap-2">
+                  <ProfileAvatar
+                    name={entry.profile.name}
+                    color={entry.profile.color}
+                    size="sm"
+                  />
+                  <span class="min-w-0 flex-1 truncate text-sm font-medium">
+                    {entry.profile.name}
+                  </span>
+                  <span class="text-xs tabular-nums text-muted-foreground">
+                    {entry.completed}/{entry.total}
+                  </span>
+                </div>
+                <div style:--primary={entry.profile.color}>
+                  <Progress
+                    value={entry.percentage}
+                    aria-label={`${entry.profile.name}: ${entry.percentage}%`}
+                  />
+                </div>
+              </div>
+            {/each}
+          {:else}
+            <p class="text-sm text-muted-foreground">{text.home.noProgress}</p>
+          {/if}
+        </div>
+      {/if}
+    </Card.Content>
+    </Card.Root>
+  </div>
 </div>
