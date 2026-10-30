@@ -36,7 +36,7 @@
   import { getTaskStore } from "#lib/task-store.js";
   import {
     dateKeyInTimeZone,
-    setTaskCompleted,
+    setTaskOccurrenceStatus,
     type DailyTask,
     type TaskDayPart,
   } from "#lib/tasks.js";
@@ -129,7 +129,9 @@
     new Map($appSettings.profiles.map((profile) => [profile.id, profile])),
   );
   let progressTasks = $derived(
-    tasks.filter((task) => visibleProfileIds.has(task.profileId)),
+    tasks.filter(
+      (task) => visibleProfileIds.has(task.profileId) && !task.skipped,
+    ),
   );
   let completedTaskCount = $derived(
     progressTasks.filter((task) => task.completed).length,
@@ -163,7 +165,7 @@
   let visibleTasks = $derived(
     tasks.filter(
       (task) =>
-        !task.completed &&
+        task.status === "pending" &&
         visibleProfileIds.has(task.profileId) &&
         taskIsCurrentOrUpcoming(task, dayPart),
     ).sort((first, second) => {
@@ -185,7 +187,7 @@
     const taskItems: TimelineItem[] = visibleTasks.map((task) => {
       return {
         kind: "task",
-        key: `task:${task.id}:${task.profileId}`,
+        key: `task:${task.id}:${task.profileId}:${task.occurrenceDate}`,
         sortMinutes: taskSortMinutes(task, dayPart),
         task,
       };
@@ -254,18 +256,19 @@
   }
 
   function taskIsCurrentOrUpcoming(task: DailyTask, window: DayPartWindow) {
-    if (task.kind !== "routine") return true;
-    return dayPartStartMinutes(task.dayPart) >= window.startMinutes;
+    return task.occurrenceDate <= todayKey && window.dayEnd > now;
   }
 
   function taskSortMinutes(task: DailyTask, window: DayPartWindow) {
     if (task.kind === "routine") {
       const startMinutes = dayPartStartMinutes(task.dayPart);
+      if (startMinutes < window.startMinutes) return window.startMinutes - 2;
       return startMinutes === window.startMinutes
         ? window.currentMinutes - 1
         : startMinutes;
     }
 
+    if (task.overdue) return window.startMinutes - 3;
     const dueMinutes = dueTimeMinutes(task.dueTime);
     if (dueMinutes === null || dueMinutes <= window.currentMinutes) {
       return window.currentMinutes - 1;
@@ -297,12 +300,15 @@
   }
 
   function taskTime(task: DailyTask) {
+    if (task.overdue) return text.tasks.overdue;
     if (
       task.kind === "routine" &&
       task.dayPart &&
       task.dayPart !== dayPart.id
     ) {
-      return text.tasks[task.dayPart];
+      return dayPartStartMinutes(task.dayPart) < dayPart.startMinutes
+        ? `${text.tasks[task.dayPart]} · ${text.tasks.earlierOpen}`
+        : text.tasks[task.dayPart];
     }
     return task.dueTime?.slice(0, 5) ?? text.tasks.now;
   }
@@ -336,22 +342,23 @@
     const session = get(householdSession);
     if (!session.household) return;
 
-    const key = `${task.id}:${task.profileId}`;
+    const key = `${task.id}:${task.profileId}:${task.occurrenceDate}`;
     taskActionError = "";
     pendingCompletions = [...pendingCompletions, key];
-    taskStore.setCompleted(task.id, task.profileId, true);
+    taskStore.setStatus(task.id, task.profileId, task.occurrenceDate, "completed");
 
     try {
-      await setTaskCompleted(
+      await setTaskOccurrenceStatus(
         session.household.id,
         task.id,
         task.profileId,
+        task.occurrenceDate,
+        "completed",
         todayKey,
-        true,
       );
     } catch (error) {
       console.error("Unable to complete task from home", error);
-      taskStore.setCompleted(task.id, task.profileId, false);
+      taskStore.setStatus(task.id, task.profileId, task.occurrenceDate, "pending");
       taskActionError = text.tasks.completeError;
     } finally {
       pendingCompletions = pendingCompletions.filter((item) => item !== key);
@@ -537,7 +544,7 @@
             {#if item.kind === "task"}
               {@const task = item.task}
               {@const profile = profileForTask(task)}
-              {@const completionKey = `${task.id}:${task.profileId}`}
+              {@const completionKey = `${task.id}:${task.profileId}:${task.occurrenceDate}`}
               <label class="grid min-h-14 cursor-pointer grid-cols-[4rem_auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border bg-background px-3 py-2 transition-colors hover:bg-accent/50">
                 <time class="text-xs font-medium tabular-nums text-muted-foreground">
                   {taskTime(task)}

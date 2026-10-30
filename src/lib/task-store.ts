@@ -9,6 +9,7 @@ import {
   getDailyTasks,
   subscribeToTasks,
   type DailyTask,
+  type TaskOccurrenceStatus,
 } from "#lib/tasks.js";
 
 type TaskStoreState = {
@@ -24,7 +25,7 @@ type CachedTaskSnapshot = {
 };
 
 const TASK_STORE_CONTEXT = Symbol("task-store");
-const TASK_CACHE_VERSION = 1;
+const TASK_CACHE_VERSION = 2;
 const initialState: TaskStoreState = {
   tasks: [],
   loading: false,
@@ -211,12 +212,24 @@ function createTaskStore() {
     }
   }
 
-  function setCompleted(taskId: string, profileId: string, completed: boolean) {
+  function setStatus(
+    taskId: string,
+    profileId: string,
+    occurrenceDate: string,
+    status: TaskOccurrenceStatus,
+  ) {
     let nextTasks: DailyTask[] = [];
     state.update((current) => {
       nextTasks = current.tasks.map((task) =>
-        task.id === taskId && task.profileId === profileId
-          ? { ...task, completed }
+        task.id === taskId &&
+        task.profileId === profileId &&
+        task.occurrenceDate === occurrenceDate
+          ? {
+              ...task,
+              status,
+              completed: status === "completed",
+              skipped: status === "skipped",
+            }
           : task,
       );
       return { ...current, tasks: nextTasks };
@@ -225,6 +238,23 @@ function createTaskStore() {
       snapshotKey = `${householdId}:${dateKey}`;
       persistSnapshot(householdId, dateKey, nextTasks);
     }
+  }
+
+  function setCompleted(taskId: string, profileId: string, completed: boolean) {
+    let occurrenceDate = dateKey;
+    state.update((current) => {
+      occurrenceDate =
+        current.tasks.find(
+          (task) => task.id === taskId && task.profileId === profileId,
+        )?.occurrenceDate ?? dateKey;
+      return current;
+    });
+    setStatus(
+      taskId,
+      profileId,
+      occurrenceDate,
+      completed ? "completed" : "pending",
+    );
   }
 
   function removeTask(taskId: string) {
@@ -257,6 +287,7 @@ function createTaskStore() {
     subscribe: state.subscribe,
     ensure,
     refresh,
+    setStatus,
     setCompleted,
     removeTask,
     destroy() {

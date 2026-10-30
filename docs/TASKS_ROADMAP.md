@@ -47,7 +47,11 @@ Implemented:
 - Assign a task to one or more profiles.
 - Add an optional emoji for quick visual recognition.
 - Check and uncheck tasks with optimistic feedback.
+- Skip and reopen routine or repeating-chore occurrences from the overflow menu.
 - Move completed tasks below incomplete tasks.
+- Keep unfinished earlier routines on Home until the day ends.
+- Carry one-time and repeating chores forward as overdue until they are resolved.
+- Exclude skipped occurrences from daily progress.
 - Synchronize task changes between devices with Supabase Realtime.
 - Reset routine completion naturally by recording it per occurrence date.
 - Provide Dutch and English interface copy.
@@ -55,11 +59,29 @@ Implemented:
 Current deliberate limits:
 
 - The board shows today only.
-- Tasks cannot yet be skipped or reordered in the interface.
+- Tasks cannot yet be reordered in the interface.
 - Chore recurrence currently uses a single start date. Weekly chores repeat on
   that weekday; monthly chores repeat on that day number and use the last day of
   shorter months when necessary.
-- There is no overdue filter or unassigned task column.
+- There is no historical missed-task view, overdue filter, or unassigned task column.
+
+## Occurrence Lifecycle
+
+- A routine is pending only for its scheduled date. If it remains open after its
+  day-part, Home keeps it visible as an earlier open routine until midnight.
+- An unresolved routine expires at midnight. It does not roll into tomorrow's
+  checklist or reduce tomorrow's progress.
+- A chore resolves to its latest scheduled occurrence. If it is still pending
+  after that date, it remains visible as overdue.
+- Resolving an overdue chore counts toward the day it was actually completed or
+  skipped. It disappears on the following day until its next scheduled occurrence.
+- Completing an occurrence counts toward progress. Skipping preserves the state
+  for history and synchronization but removes it from the progress denominator.
+- Reopening a completed or skipped occurrence returns that same occurrence to
+  pending.
+- Repeating chores do not accumulate duplicate overdue cards. The latest scheduled
+  occurrence is the actionable one; richer backlog/history views can expose older
+  missed occurrences later.
 
 ## Phase 2: Management
 
@@ -77,13 +99,13 @@ Acceptance criteria:
 - Destructive recurring actions clearly state their scope.
 - A failed mutation restores the previous visible state.
 
-## Phase 3: Recurrence And Skip
+## Phase 3: Advanced Recurrence And History
 
 - Let one routine appear in multiple day-parts without duplicating its definition.
 - Add custom recurrence intervals and selected weekdays for chores.
 - Add optional recurrence end dates.
-- Store skipped occurrences separately from completed occurrences.
-- Support complete, incomplete, skip, and unskip actions.
+- Materialize unresolved past routines as missed occurrences for history and reports.
+- Add a history view for completed, skipped, and missed occurrences.
 - Define timezone and daylight-saving behavior in the household timezone.
 
 Acceptance criteria:
@@ -157,6 +179,6 @@ pnpm test:tasks
 ```
 
 The task integration test creates temporary owner and member accounts, creates a
-multi-profile routine, verifies household reads, completes it as the member,
-checks synchronization as the owner, rejects an invalid completion, and cleans up
-all test data.
+multi-profile routine, verifies household reads, completes and skips occurrences
+as the member, checks synchronization as the owner, rejects an invalid completion,
+and cleans up all test data.

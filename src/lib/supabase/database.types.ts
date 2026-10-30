@@ -309,6 +309,54 @@ export type Database = {
           },
         ];
       };
+      task_occurrence_states: {
+        Row: {
+          household_id: string;
+          occurrence_date: string;
+          profile_id: string;
+          resolved_at: string;
+          resolved_by: string | null;
+          resolved_date: string;
+          status: string;
+          task_id: string;
+        };
+        Insert: {
+          household_id: string;
+          occurrence_date: string;
+          profile_id: string;
+          resolved_at?: string;
+          resolved_by?: string | null;
+          resolved_date?: string;
+          status: string;
+          task_id: string;
+        };
+        Update: {
+          household_id?: string;
+          occurrence_date?: string;
+          profile_id?: string;
+          resolved_at?: string;
+          resolved_by?: string | null;
+          resolved_date?: string;
+          status?: string;
+          task_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "task_occurrence_states_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "task_occurrence_states_task_id_household_id_profile_id_fkey";
+            columns: ["task_id", "household_id", "profile_id"];
+            isOneToOne: false;
+            referencedRelation: "task_assignments";
+            referencedColumns: ["task_id", "household_id", "profile_id"];
+          },
+        ];
+      };
       tasks: {
         Row: {
           created_at: string;

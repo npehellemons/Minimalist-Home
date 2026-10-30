@@ -210,6 +210,42 @@ try {
     throw new Error("Task completion did not synchronize across members");
   }
 
+  const { data: completionStates, error: completionStatesError } = await owner
+    .from("task_occurrence_states")
+    .select("task_id, profile_id, occurrence_date, status, resolved_date")
+    .eq("task_id", taskId)
+    .eq("profile_id", person.id);
+  if (completionStatesError) throw completionStatesError;
+  if (
+    completionStates.length !== 1 ||
+    completionStates[0].status !== "completed" ||
+    completionStates[0].occurrence_date !== occurrenceDate
+  ) {
+    throw new Error("Task completion was not mirrored to its occurrence state");
+  }
+
+  const { error: skipError } = await member
+    .from("task_occurrence_states")
+    .upsert({
+      task_id: taskId,
+      household_id: householdId,
+      profile_id: family.id,
+      occurrence_date: occurrenceDate,
+      resolved_date: occurrenceDate,
+      status: "skipped",
+    });
+  if (skipError) throw skipError;
+
+  const { data: skippedStates, error: skippedStatesError } = await owner
+    .from("task_occurrence_states")
+    .select("status")
+    .eq("task_id", taskId)
+    .eq("profile_id", family.id);
+  if (skippedStatesError) throw skippedStatesError;
+  if (skippedStates.length !== 1 || skippedStates[0].status !== "skipped") {
+    throw new Error("A household member could not skip an assigned task");
+  }
+
   const { error: invalidAssignmentError } = await member
     .from("task_completions")
     .insert({
@@ -234,27 +270,38 @@ try {
     throw new Error("Household member could not remove the task");
   }
 
-  const [remainingTasks, remainingAssignments, remainingCompletions] =
+  const [
+    remainingTasks,
+    remainingAssignments,
+    remainingCompletions,
+    remainingOccurrenceStates,
+  ] =
     await Promise.all([
       owner.from("tasks").select("id").eq("id", taskId),
       owner.from("task_assignments").select("task_id").eq("task_id", taskId),
       owner.from("task_completions").select("task_id").eq("task_id", taskId),
+      owner
+        .from("task_occurrence_states")
+        .select("task_id")
+        .eq("task_id", taskId),
     ]);
   const cascadeError =
     remainingTasks.error ??
     remainingAssignments.error ??
-    remainingCompletions.error;
+    remainingCompletions.error ??
+    remainingOccurrenceStates.error;
   if (cascadeError) throw cascadeError;
   if (
     remainingTasks.data.length !== 0 ||
     remainingAssignments.data.length !== 0 ||
-    remainingCompletions.data.length !== 0
+    remainingCompletions.data.length !== 0 ||
+    remainingOccurrenceStates.data.length !== 0
   ) {
     throw new Error("Removing a task did not cascade its related records");
   }
 
   console.log(
-    "Household task create, update, complete, and delete RLS smoke test passed",
+    "Household task create, update, complete, skip, and delete RLS smoke test passed",
   );
 } finally {
   if (householdId) {

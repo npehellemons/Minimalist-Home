@@ -6,10 +6,16 @@ import type { Tables } from "#lib/supabase/database.types.js";
 export type TaskKind = "routine" | "chore";
 export type TaskDayPart = "morning" | "afternoon" | "evening";
 export type ChoreRecurrence = "none" | "daily" | "weekly" | "monthly";
+export type TaskOccurrenceStatus =
+  | "pending"
+  | "completed"
+  | "skipped"
+  | "missed";
 
 type TaskRow = Tables<"tasks">;
 type TaskAssignmentRow = Tables<"task_assignments">;
 type TaskCompletionRow = Tables<"task_completions">;
+type TaskOccurrenceStateRow = Tables<"task_occurrence_states">;
 
 let taskSubscriptionSequence = 0;
 
@@ -25,7 +31,11 @@ export type DailyTask = {
   dueDate: string | null;
   dueTime: string | null;
   recurrence: ChoreRecurrence;
+  occurrenceDate: string;
+  status: TaskOccurrenceStatus;
   completed: boolean;
+  skipped: boolean;
+  overdue: boolean;
 };
 
 export type CreateTaskInput = {
@@ -82,28 +92,62 @@ function dayDifference(fromDateKey: string, toDateKey: string) {
   );
 }
 
-function choreAppliesOnDate(task: TaskRow, dateKey: string) {
-  if (!task.due_date || dateKey < task.due_date) return false;
+function formatDateKey(year: number, month: number, day: number) {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function shiftDateKey(dateKey: string, days: number) {
+  const date = parseDateKey(dateKey);
+  const shifted = new Date(Date.UTC(date.year, date.month - 1, date.day + days));
+  return formatDateKey(
+    shifted.getUTCFullYear(),
+    shifted.getUTCMonth() + 1,
+    shifted.getUTCDate(),
+  );
+}
+
+function monthlyOccurrenceDate(anchorDateKey: string, dateKey: string) {
+  const anchor = parseDateKey(anchorDateKey);
+  const target = parseDateKey(dateKey);
+  const lastDay = new Date(Date.UTC(target.year, target.month, 0)).getUTCDate();
+  const candidate = formatDateKey(
+    target.year,
+    target.month,
+    Math.min(anchor.day, lastDay),
+  );
+  if (candidate <= dateKey) return candidate;
+
+  const previousMonth = new Date(Date.UTC(target.year, target.month - 2, 1));
+  const previousYear = previousMonth.getUTCFullYear();
+  const previousMonthNumber = previousMonth.getUTCMonth() + 1;
+  const previousLastDay = new Date(
+    Date.UTC(previousYear, previousMonthNumber, 0),
+  ).getUTCDate();
+  return formatDateKey(
+    previousYear,
+    previousMonthNumber,
+    Math.min(anchor.day, previousLastDay),
+  );
+}
+
+function choreOccurrenceDate(task: TaskRow, dateKey: string) {
+  if (!task.due_date || dateKey < task.due_date) return null;
 
   const recurrence = task.recurrence as ChoreRecurrence;
-  if (recurrence === "none") return task.due_date === dateKey;
-  if (recurrence === "daily") return true;
+  if (recurrence === "none") return task.due_date;
+  if (recurrence === "daily") return dateKey;
   if (recurrence === "weekly") {
-    return dayDifference(task.due_date, dateKey) % 7 === 0;
+    return shiftDateKey(
+      dateKey,
+      -(dayDifference(task.due_date, dateKey) % 7),
+    );
   }
-
-  const anchor = parseDateKey(task.due_date);
-  const target = parseDateKey(dateKey);
-  const lastDayOfTargetMonth = new Date(
-    Date.UTC(target.year, target.month, 0),
-  ).getUTCDate();
-
-  return target.day === Math.min(anchor.day, lastDayOfTargetMonth);
+  return monthlyOccurrenceDate(task.due_date, dateKey);
 }
 
 function appliesOnDate(task: TaskRow, dateKey: string, weekday: number) {
   if (!task.is_active) return false;
-  if (task.kind === "chore") return choreAppliesOnDate(task, dateKey);
+  if (task.kind === "chore") return choreOccurrenceDate(task, dateKey) !== null;
   return task.weekdays?.includes(weekday) === true;
 }
 
@@ -112,7 +156,12 @@ export async function getDailyTasks(
   dateKey: string,
 ): Promise<DailyTask[]> {
   const client = requireSupabase();
-  const [tasksResult, assignmentsResult, completionsResult] = await Promise.all([
+  const [
+    tasksResult,
+    assignmentsResult,
+    completionsResult,
+    occurrenceStatesResult,
+  ] = await Promise.all([
     client
       .from("tasks")
       .select("*")
@@ -128,10 +177,18 @@ export async function getDailyTasks(
       .from("task_completions")
       .select("*")
       .eq("household_id", householdId)
-      .eq("occurrence_date", dateKey),
+      .lte("occurrence_date", dateKey),
+    client
+      .from("task_occurrence_states")
+      .select("*")
+      .eq("household_id", householdId)
+      .lte("occurrence_date", dateKey),
   ]);
   const error =
-    tasksResult.error ?? assignmentsResult.error ?? completionsResult.error;
+    tasksResult.error ??
+    assignmentsResult.error ??
+    completionsResult.error ??
+    occurrenceStatesResult.error;
 
   if (error) throw error;
 
@@ -143,7 +200,18 @@ export async function getDailyTasks(
   const completionKeys = new Set(
     (completionsResult.data ?? []).map(
       (completion: TaskCompletionRow) =>
-        `${completion.task_id}\u0000${completion.profile_id}`,
+        `${completion.task_id}\u0000${completion.profile_id}\u0000${completion.occurrence_date}`,
+    ),
+  );
+  const occurrenceStates = new Map(
+    (occurrenceStatesResult.data ?? []).map(
+      (occurrence: TaskOccurrenceStateRow) => [
+        `${occurrence.task_id}\u0000${occurrence.profile_id}\u0000${occurrence.occurrence_date}`,
+        {
+          status: occurrence.status as TaskOccurrenceStatus,
+          resolvedDate: occurrence.resolved_date,
+        },
+      ],
     ),
   );
 
@@ -151,6 +219,26 @@ export async function getDailyTasks(
     (assignment: TaskAssignmentRow): DailyTask[] => {
       const task = tasksById.get(assignment.task_id);
       if (!task) return [];
+      const occurrenceDate =
+        task.kind === "chore"
+          ? (choreOccurrenceDate(task, dateKey) ?? dateKey)
+          : dateKey;
+      const occurrenceKey = `${assignment.task_id}\u0000${assignment.profile_id}\u0000${occurrenceDate}`;
+      const occurrenceState = occurrenceStates.get(occurrenceKey);
+      const status =
+        occurrenceState?.status ??
+        (completionKeys.has(occurrenceKey) ? "completed" : "pending");
+      const overdue = task.kind === "chore" && occurrenceDate < dateKey;
+
+      // A carried chore belongs to the day it is resolved, then leaves the daily view.
+      if (
+        task.kind === "chore" &&
+        overdue &&
+        status !== "pending" &&
+        occurrenceState?.resolvedDate !== dateKey
+      ) {
+        return [];
+      }
 
       return [
         {
@@ -165,9 +253,11 @@ export async function getDailyTasks(
           dueDate: task.due_date,
           dueTime: task.due_time,
           recurrence: task.recurrence as ChoreRecurrence,
-          completed: completionKeys.has(
-            `${assignment.task_id}\u0000${assignment.profile_id}`,
-          ),
+          occurrenceDate,
+          status,
+          completed: status === "completed",
+          skipped: status === "skipped",
+          overdue,
         },
       ];
     },
@@ -223,27 +313,88 @@ export async function setTaskCompleted(
   dateKey: string,
   completed: boolean,
 ) {
+  return setTaskOccurrenceStatus(
+    householdId,
+    taskId,
+    profileId,
+    dateKey,
+    completed ? "completed" : "pending",
+  );
+}
+
+export async function setTaskOccurrenceStatus(
+  householdId: string,
+  taskId: string,
+  profileId: string,
+  occurrenceDate: string,
+  status: Exclude<TaskOccurrenceStatus, "missed">,
+  resolvedDate = occurrenceDate,
+) {
   const client = requireSupabase();
 
-  if (completed) {
+  if (status === "completed") {
+    const { error: clearStateError } = await client
+      .from("task_occurrence_states")
+      .delete()
+      .eq("household_id", householdId)
+      .eq("task_id", taskId)
+      .eq("profile_id", profileId)
+      .eq("occurrence_date", occurrenceDate);
+    if (clearStateError) throw clearStateError;
+
     const { error } = await client.from("task_completions").upsert({
       household_id: householdId,
       task_id: taskId,
       profile_id: profileId,
-      occurrence_date: dateKey,
+      occurrence_date: occurrenceDate,
+    });
+    if (error) throw error;
+
+    const { error: stateError } = await client
+      .from("task_occurrence_states")
+      .upsert({
+        household_id: householdId,
+        task_id: taskId,
+        profile_id: profileId,
+        occurrence_date: occurrenceDate,
+        status: "completed",
+        resolved_at: new Date().toISOString(),
+        resolved_date: resolvedDate,
+      });
+    if (stateError) throw stateError;
+    return;
+  }
+
+  const { error: completionError } = await client
+    .from("task_completions")
+    .delete()
+    .eq("household_id", householdId)
+    .eq("task_id", taskId)
+    .eq("profile_id", profileId)
+    .eq("occurrence_date", occurrenceDate);
+  if (completionError) throw completionError;
+
+  if (status === "skipped") {
+    const { error } = await client.from("task_occurrence_states").upsert({
+      household_id: householdId,
+      task_id: taskId,
+      profile_id: profileId,
+      occurrence_date: occurrenceDate,
+      status,
+      resolved_at: new Date().toISOString(),
+      resolved_date: resolvedDate,
     });
     if (error) throw error;
     return;
   }
 
   const { error } = await client
-    .from("task_completions")
+    .from("task_occurrence_states")
     .delete()
     .eq("household_id", householdId)
     .eq("task_id", taskId)
     .eq("profile_id", profileId)
-    .eq("occurrence_date", dateKey);
-
+    .eq("occurrence_date", occurrenceDate);
   if (error) throw error;
 }
 
@@ -268,7 +419,12 @@ export function subscribeToTasks(householdId: string, onChange: () => void) {
     `household-tasks:${householdId}:${subscriptionId}`,
   );
 
-  for (const table of ["tasks", "task_assignments", "task_completions"] as const) {
+  for (const table of [
+    "tasks",
+    "task_assignments",
+    "task_completions",
+    "task_occurrence_states",
+  ] as const) {
     channel.on(
       "postgres_changes",
       {

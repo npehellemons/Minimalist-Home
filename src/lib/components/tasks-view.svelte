@@ -28,7 +28,7 @@
     createTask,
     dateKeyInTimeZone,
     deleteTask,
-    setTaskCompleted,
+    setTaskOccurrenceStatus,
     updateTask,
     type DailyTask,
     type ChoreRecurrence,
@@ -79,9 +79,11 @@
 
   function sortedTasks(tasks: DailyTask[]) {
     return [...tasks].sort((first, second) => {
-      if (first.completed !== second.completed) {
-        return Number(first.completed) - Number(second.completed);
+      const statusOrder = { pending: 0, completed: 1, skipped: 2, missed: 3 };
+      if (first.status !== second.status) {
+        return statusOrder[first.status] - statusOrder[second.status];
       }
+      if (first.overdue !== second.overdue) return first.overdue ? -1 : 1;
       if (first.kind !== second.kind) return first.kind === "routine" ? -1 : 1;
       return first.title.localeCompare(second.title);
     });
@@ -89,6 +91,10 @@
 
   function completedCount(tasks: DailyTask[]) {
     return tasks.filter((task) => task.completed).length;
+  }
+
+  function progressTotal(tasks: DailyTask[]) {
+    return tasks.filter((task) => !task.skipped).length;
   }
 
   const initialNow = new Date();
@@ -272,22 +278,71 @@
     const session = get(householdSession);
     if (!session.household) return;
 
-    const pendingKey = `${task.id}\u0000${task.profileId}`;
-    const previous = task.completed;
+    const pendingKey = `${task.id}\u0000${task.profileId}\u0000${task.occurrenceDate}`;
+    const previousStatus = task.status;
     taskActionError = "";
-    taskStore.setCompleted(task.id, task.profileId, completed);
+    taskStore.setStatus(
+      task.id,
+      task.profileId,
+      task.occurrenceDate,
+      completed ? "completed" : "pending",
+    );
     pendingCompletions = [...pendingCompletions, pendingKey];
 
     try {
-      await setTaskCompleted(
+      await setTaskOccurrenceStatus(
         session.household.id,
         task.id,
         task.profileId,
+        task.occurrenceDate,
+        completed ? "completed" : "pending",
         todayKey,
-        completed,
       );
     } catch {
-      taskStore.setCompleted(task.id, task.profileId, previous);
+      taskStore.setStatus(
+        task.id,
+        task.profileId,
+        task.occurrenceDate,
+        previousStatus,
+      );
+      taskActionError = text.tasks.completeError;
+    } finally {
+      pendingCompletions = pendingCompletions.filter((key) => key !== pendingKey);
+    }
+  }
+
+  async function setSkipped(task: DailyTask, skipped: boolean) {
+    const session = get(householdSession);
+    if (!session.household) return;
+
+    const pendingKey = `${task.id}\u0000${task.profileId}\u0000${task.occurrenceDate}`;
+    const previousStatus = task.status;
+    const nextStatus = skipped ? "skipped" : "pending";
+    taskActionError = "";
+    pendingCompletions = [...pendingCompletions, pendingKey];
+    taskStore.setStatus(
+      task.id,
+      task.profileId,
+      task.occurrenceDate,
+      nextStatus,
+    );
+
+    try {
+      await setTaskOccurrenceStatus(
+        session.household.id,
+        task.id,
+        task.profileId,
+        task.occurrenceDate,
+        nextStatus,
+        todayKey,
+      );
+    } catch {
+      taskStore.setStatus(
+        task.id,
+        task.profileId,
+        task.occurrenceDate,
+        previousStatus,
+      );
       taskActionError = text.tasks.completeError;
     } finally {
       pendingCompletions = pendingCompletions.filter((key) => key !== pendingKey);
@@ -434,6 +489,7 @@
       {#each visibleProfiles as profile (profile.id)}
         {@const profileTasks = tasksForProfile(profile)}
         {@const completed = completedCount(profileTasks)}
+        {@const total = progressTotal(profileTasks)}
         <div
           class="h-full w-[100cqw] max-w-[100cqw] basis-[100cqw] shrink-0 snap-center p-4 md:w-auto md:max-w-none md:snap-none md:basis-[var(--profile-card-basis)] md:p-0"
           style={`--profile-card-basis: ${profileCardBasis}`}
@@ -452,9 +508,9 @@
               <Badge
                 variant="secondary"
                 class="size-10 rounded-full p-0 text-sm font-semibold tabular-nums"
-                aria-label={`${completed} / ${profileTasks.length} ${text.tasks.completed}`}
+                aria-label={`${completed} / ${total} ${text.tasks.completed}`}
               >
-                {completed}/{profileTasks.length}
+                {completed}/{total}
               </Badge>
             </Card.Header>
 
@@ -476,17 +532,17 @@
                     <p class="text-sm">{text.tasks.empty}</p>
                   </div>
                 {:else}
-                  {#each sortedTasks(profileTasks) as task (`${task.id}-${task.profileId}`)}
-                    {@const pendingKey = `${task.id}\u0000${task.profileId}`}
+                  {#each sortedTasks(profileTasks) as task (`${task.id}-${task.profileId}-${task.occurrenceDate}`)}
+                    {@const pendingKey = `${task.id}\u0000${task.profileId}\u0000${task.occurrenceDate}`}
                     <div
                       class="flex min-h-16 items-center gap-1 px-2 text-sm"
-                      class:text-muted-foreground={task.completed}
+                      class:text-muted-foreground={task.completed || task.skipped}
                     >
                       <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-2 py-3">
                         <Checkbox
                           class="size-6"
                           checked={task.completed}
-                          disabled={pendingCompletions.includes(pendingKey)}
+                          disabled={task.skipped || pendingCompletions.includes(pendingKey)}
                           aria-label={task.title}
                           onCheckedChange={(checked) =>
                             void toggleTask(task, checked === true)}
@@ -495,11 +551,18 @@
                           <span class="text-xl" aria-hidden="true">{task.emoji}</span>
                         {/if}
                         <span class="min-w-0 flex-1">
-                          <span class="block font-medium" class:line-through={task.completed}>
+                          <span
+                            class="block font-medium"
+                            class:line-through={task.completed || task.skipped}
+                          >
                             {task.title}
                           </span>
                           <span class="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                            {#if task.kind === "routine"}
+                            {#if task.skipped}
+                              {text.tasks.skipped}
+                            {:else if task.overdue}
+                              {text.tasks.overdue}
+                            {:else if task.kind === "routine"}
                               <Repeat2 class="size-3" aria-hidden="true" />
                               {text.tasks.routine}
                             {:else}
@@ -530,6 +593,15 @@
                           {/snippet}
                         </DropdownMenu.Trigger>
                         <DropdownMenu.Content align="end">
+                          {#if task.skipped}
+                            <DropdownMenu.Item onSelect={() => void setSkipped(task, false)}>
+                              {text.tasks.unskip}
+                            </DropdownMenu.Item>
+                          {:else if !task.completed && (task.kind === "routine" || task.recurrence !== "none")}
+                            <DropdownMenu.Item onSelect={() => void setSkipped(task, true)}>
+                              {text.tasks.skip}
+                            </DropdownMenu.Item>
+                          {/if}
                           <DropdownMenu.Item onSelect={() => openEditTask(task)}>
                             {text.tasks.edit}
                           </DropdownMenu.Item>
