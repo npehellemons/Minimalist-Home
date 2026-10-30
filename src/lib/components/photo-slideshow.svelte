@@ -19,7 +19,7 @@
   import { appLocale, translations } from "#lib/i18n.js";
   import { getWeatherStore } from "#lib/weather-store.js";
 
-  const PHOTO_DURATION = 15_000;
+  const PHOTO_DURATION = 30_000;
 
   let { onExit }: { onExit: () => void } = $props();
 
@@ -147,6 +147,8 @@
   onMount(() => {
     const session = get(householdSession);
     let clockTimeout: number;
+    let photoTimeout: number;
+    let mounted = true;
 
     function scheduleClockUpdate() {
       const delayUntilNextMinute = 60_000 - (Date.now() % 60_000) + 50;
@@ -156,9 +158,20 @@
       }, delayUntilNextMinute);
     }
 
+    function schedulePhotoAdvance() {
+      if (!mounted) return;
+      window.clearTimeout(photoTimeout);
+      photoTimeout = window.setTimeout(() => {
+        try {
+          advancePhoto();
+        } finally {
+          schedulePhotoAdvance();
+        }
+      }, PHOTO_DURATION);
+    }
+
     scheduleClockUpdate();
-    void loadPhotos();
-    const photoInterval = window.setInterval(advancePhoto, PHOTO_DURATION);
+    void loadPhotos().finally(schedulePhotoAdvance);
     const photoUrlRefreshInterval = window.setInterval(
       () => void loadPhotos(),
       PHOTO_URL_REFRESH_INTERVAL,
@@ -168,8 +181,9 @@
       : () => undefined;
 
     return () => {
+      mounted = false;
       window.clearTimeout(clockTimeout);
-      window.clearInterval(photoInterval);
+      window.clearTimeout(photoTimeout);
       window.clearInterval(photoUrlRefreshInterval);
       unsubscribePhotos();
     };
