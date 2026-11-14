@@ -721,7 +721,7 @@
         </div>
       </div>
     </Card.Header>
-    <Card.Content class="grid gap-3 py-3 md:gap-5 md:py-5">
+    <Card.Content class="grid gap-3 py-3 md:gap-4 md:py-4">
       {#if tasksLoading && progressTasks.length === 0}
         <Skeleton class="h-16 w-full" />
       {:else}
@@ -739,31 +739,40 @@
           />
         </div>
 
-        <div class="hidden gap-4 md:grid">
+        <div class="hidden gap-3 md:grid">
           {#if profileProgress.length > 0}
             {#each profileProgress as entry (entry.profile.id)}
-              <div class="grid gap-2">
-                <div class="flex items-center gap-2">
+              <div class="grid min-h-20 grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-md border bg-muted/20 p-3">
+                <div class="self-start">
                   {#key $taskCompletionCelebration?.profileId === entry.profile.id ? $taskCompletionCelebration.id : 0}
                     <ProfileAvatar
                       name={entry.profile.name}
                       color={entry.profile.color}
-                      size="sm"
+                      size="lg"
                       class={$taskCompletionCelebration?.profileId === entry.profile.id
-                        ? "task-completion-celebration"
-                        : undefined}
+                        ? "size-12 task-completion-celebration"
+                        : "size-12"}
                     />
                   {/key}
-                  <span class="min-w-0 flex-1 truncate text-sm font-medium">
-                    {entry.profile.name}
-                  </span>
-                  <span class="text-xs tabular-nums text-muted-foreground">
-                    {entry.completed}/{entry.total}
-                  </span>
                 </div>
-                <div style:--primary={entry.profile.color}>
+                <div class="grid min-w-0 gap-2">
+                  <div class="flex items-baseline justify-between gap-3">
+                    <div class="min-w-0">
+                      <strong class="block truncate text-base">
+                        {entry.profile.name}
+                      </strong>
+                      <span class="text-xs tabular-nums text-muted-foreground">
+                        {entry.completed}/{entry.total} {text.home.completed}
+                      </span>
+                    </div>
+                    <strong class="shrink-0 text-lg tabular-nums">
+                      {entry.percentage}%
+                    </strong>
+                  </div>
                   <Progress
                     value={entry.percentage}
+                    class="h-2"
+                    style={`--primary: ${entry.profile.color}`}
                     aria-label={`${entry.profile.name}: ${entry.percentage}%`}
                   />
                 </div>
