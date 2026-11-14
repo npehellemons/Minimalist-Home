@@ -22,6 +22,7 @@
     type HouseholdCalendarEvent,
   } from "#lib/calendar-events.js";
   import { CALENDAR_REFRESH_INTERVAL } from "#lib/calendar-feed.js";
+  import { playCompletionSound } from "#lib/completion-sound.js";
   import ProfileAvatar from "#lib/components/profile-avatar.svelte";
   import * as Alert from "#lib/components/ui/alert/index.js";
   import { Badge } from "#lib/components/ui/badge/index.js";
@@ -375,6 +376,7 @@
     taskActionError = "";
     pendingCompletions = [...pendingCompletions, key];
     taskStore.setStatus(task.id, task.profileId, task.occurrenceDate, "completed");
+    playCompletionSound();
 
     try {
       await setTaskOccurrenceStatus(
