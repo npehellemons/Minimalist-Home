@@ -22,6 +22,10 @@
     type HouseholdCalendarEvent,
   } from "#lib/calendar-events.js";
   import { CALENDAR_REFRESH_INTERVAL } from "#lib/calendar-feed.js";
+  import {
+    celebrateTaskCompletion,
+    taskCompletionCelebration,
+  } from "#lib/completion-feedback.js";
   import { playCompletionSound } from "#lib/completion-sound.js";
   import ProfileAvatar from "#lib/components/profile-avatar.svelte";
   import * as Alert from "#lib/components/ui/alert/index.js";
@@ -377,6 +381,7 @@
     pendingCompletions = [...pendingCompletions, key];
     taskStore.setStatus(task.id, task.profileId, task.occurrenceDate, "completed");
     playCompletionSound();
+    celebrateTaskCompletion(task.profileId);
 
     try {
       await setTaskOccurrenceStatus(
@@ -739,11 +744,16 @@
             {#each profileProgress as entry (entry.profile.id)}
               <div class="grid gap-2">
                 <div class="flex items-center gap-2">
-                  <ProfileAvatar
-                    name={entry.profile.name}
-                    color={entry.profile.color}
-                    size="sm"
-                  />
+                  {#key $taskCompletionCelebration?.profileId === entry.profile.id ? $taskCompletionCelebration.id : 0}
+                    <ProfileAvatar
+                      name={entry.profile.name}
+                      color={entry.profile.color}
+                      size="sm"
+                      class={$taskCompletionCelebration?.profileId === entry.profile.id
+                        ? "task-completion-celebration"
+                        : undefined}
+                    />
+                  {/key}
                   <span class="min-w-0 flex-1 truncate text-sm font-medium">
                     {entry.profile.name}
                   </span>

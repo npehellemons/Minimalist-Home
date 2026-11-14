@@ -7,6 +7,7 @@
     appSettings,
     type HouseholdProfile,
   } from "#lib/app-settings.js";
+  import { celebrateTaskCompletion } from "#lib/completion-feedback.js";
   import { playCompletionSound } from "#lib/completion-sound.js";
   import ProfileAvatar from "#lib/components/profile-avatar.svelte";
   import * as Alert from "#lib/components/ui/alert/index.js";
@@ -288,7 +289,10 @@
       task.occurrenceDate,
       completed ? "completed" : "pending",
     );
-    if (completed) playCompletionSound();
+    if (completed) {
+      playCompletionSound();
+      celebrateTaskCompletion(task.profileId);
+    }
     pendingCompletions = [...pendingCompletions, pendingKey];
 
     try {

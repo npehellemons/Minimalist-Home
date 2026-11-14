@@ -15,6 +15,7 @@
     activeProfileId,
     appSettings,
   } from "#lib/app-settings.js";
+  import { taskCompletionCelebration } from "#lib/completion-feedback.js";
   import DashboardViewLoader from "#lib/components/dashboard-view-loader.svelte";
   import DashboardTabPanel from "#lib/components/dashboard-tab-panel.svelte";
   import { getDashboardNavigation } from "#lib/dashboard-navigation.svelte.js";
@@ -126,12 +127,17 @@
                 aria-pressed={$activeProfileId === profile.id}
                 onclick={() => activeProfileId.set(profile.id)}
               >
-                <ProfileAvatar
-                  name={profile.name}
-                  color={profile.color}
-                  active={$activeProfileId === profile.id}
-                  animated={$activeProfileId === profile.id}
-                />
+                {#key $taskCompletionCelebration?.profileId === profile.id ? $taskCompletionCelebration.id : 0}
+                  <ProfileAvatar
+                    name={profile.name}
+                    color={profile.color}
+                    active={$activeProfileId === profile.id}
+                    animated={$activeProfileId === profile.id}
+                    class={$taskCompletionCelebration?.profileId === profile.id
+                      ? "task-completion-celebration"
+                      : undefined}
+                  />
+                {/key}
               </Button>
             {/each}
           </div>
