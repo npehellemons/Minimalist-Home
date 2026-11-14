@@ -1,0 +1,3 @@
+# Factory diagnostics that run persistently but are not needed by the dashboard.
+com.cghs.stresstest
+com.DeviceTest

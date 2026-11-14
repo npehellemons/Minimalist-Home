@@ -35,6 +35,14 @@ Measured on 2026-10-15:
 | Weather refresh interval | 15 minutes |
 | Calendar refresh interval | 30 minutes |
 
+Baseline recaptured on 2026-11-14 before device hardening. The device still
+runs Android 8.1/API 27 on 32-bit ARM with 976,904 kB physical memory and a
+368,936 kB zram device. At the working dashboard, 225,308 kB was available and
+Firefox 157.0.1 used approximately 391 MB PSS across its main, content, GPU,
+and crash-helper processes. The APK, package inventories, settings, system
+properties, kiosk scripts, memory reports, and a dashboard screenshot are kept
+in the gitignored timestamped `device-backups/` archive.
+
 The production address is `https://minimalist-home.vercel.app/`. The local address, `http://192.168.86.193:4174/`, remains useful for development but is not a production PWA origin and cannot provide normal service-worker guarantees.
 
 ## Success Criteria
@@ -55,14 +63,14 @@ Do not optimize by feel alone. The finished setup should meet these targets:
 
 Purpose: create a recovery point before changing the operating system.
 
-- [ ] Save the exact Firefox APK currently installed on the tablet.
-- [ ] Record `pm list packages -f` before disabling anything.
-- [ ] Record all currently enabled third-party and vendor packages.
-- [ ] Save relevant Android settings and system properties.
-- [ ] Record current Firefox process memory after a fresh boot.
+- [x] Save the exact Firefox APK currently installed on the tablet.
+- [x] Record `pm list packages -f` before disabling anything.
+- [x] Record all currently enabled third-party and vendor packages.
+- [x] Save relevant Android settings and system properties.
+- [x] Record current Firefox process memory after a fresh boot.
 - [ ] Record memory again after opening Calendar, Tasks, Settings, and Screensaver.
 - [ ] Confirm `pnpm check` and `pnpm build` pass.
-- [ ] Store recovery files outside the tablet.
+- [x] Store recovery files outside the tablet.
 
 Artifacts to keep:
 
@@ -192,7 +200,7 @@ Candidate groups to audit:
 - [ ] Fully Kiosk after the Firefox setup replaces it
 - [ ] Factory stress-test application
 - [ ] Factory device-test application
-- [ ] Vendor update and advertising services
+- [x] Vendor update and advertising services
 - [ ] Unused photo, media-scanning, Bluetooth, telephony, and printing components
 - [ ] Unused keyboard only after another maintenance input method is proven
 
@@ -213,14 +221,14 @@ Phase complete when only necessary services remain and all changes have matching
 
 Purpose: make the tablet recover without human intervention.
 
-- [ ] Wait for Android boot completion.
-- [ ] Wait for a working network route with a bounded timeout.
-- [ ] Launch the installed dashboard automatically.
-- [ ] Keep the display awake while powered.
-- [ ] Keep the tablet in landscape orientation.
-- [ ] Suppress navigation and status bars during normal operation.
-- [ ] Relaunch Firefox only when its process has exited or the app is genuinely unhealthy.
-- [ ] Avoid periodic blind page reloads.
+- [x] Wait for Android boot completion.
+- [x] Wait for a working network route with a bounded timeout.
+- [x] Launch the installed dashboard automatically.
+- [x] Keep the display awake while powered.
+- [x] Keep the tablet in landscape orientation.
+- [x] Suppress navigation, status bars, and Firefox chrome during normal operation.
+- [x] Relaunch Firefox only when its process has exited or the app is genuinely unhealthy.
+- [x] Avoid periodic blind page reloads.
 - [ ] Restart Firefox once during a quiet nightly window if soak testing shows memory growth.
 - [ ] Reboot the tablet weekly only if it improves measured stability.
 - [ ] Provide a maintenance escape path for ADB and settings access.
@@ -316,7 +324,12 @@ For every Firefox update:
 | 2026-10-15 | Cache calendars for 30 minutes | Avoid repeated downloads and iCalendar parsing | Verified |
 | 2026-10-15 | Defer swap changes | Application and background-process improvements should be measured first | Pending |
 | 2026-10-15 | Use Vercel for production hosting | Provides HTTPS, atomic static deployments, preview builds, and a small calendar proxy function | Working |
+| 2026-11-14 | Preserve a complete device baseline before hardening | Keeps the Firefox APK, package state, settings, kiosk scripts, memory reports, and screenshot recoverable | Complete |
+| 2026-11-14 | Disable ADUPS and Rockchip updater services | Both obsolete services ran in the background; disabling them is reversible and survived reboot | Working |
+| 2026-11-14 | Defer factory test removal | Package disabling and root process termination cannot suppress their persistent manifests on this firmware | Deferred |
 
 ## Next Action
 
-Start with **Phase 0: Preserve and Measure**. Do not disable additional packages or change zram until the recovery artifacts and full baseline have been saved.
+Complete the remaining cross-view Phase 0 memory measurements, then soak-test
+the updater cleanup and fullscreen boot flow before disabling another package
+group. Do not change zram until post-cleanup memory pressure has been measured.

@@ -29,10 +29,12 @@ wait_for_network() {
 }
 
 enter_dashboard_fullscreen() {
-  # The first tap opens the app's screensaver and requests browser fullscreen.
-  # The second tap returns to the dashboard while retaining fullscreen.
+  # Firefox treats the first synthetic tap as focus. The second tap opens the
+  # screensaver and requests fullscreen; the final tap returns to the dashboard.
   sleep 15
-  input tap 136 228
+  input tap 136 168
+  sleep 1
+  input tap 136 168
   sleep 2
   input tap 640 400
 }

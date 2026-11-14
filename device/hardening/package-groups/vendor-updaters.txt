@@ -1,0 +1,3 @@
+# Obsolete vendor update services on the Android 8.1 frame firmware.
+com.adups.fota
+android.rockchip.update.service

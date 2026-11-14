@@ -73,7 +73,11 @@
     if (navigation.activeTab !== "photos") returnTab = navigation.activeTab;
   });
 
-  function enterScreensaver() {
+  function enterScreensaver(event?: MouseEvent) {
+    if (event?.currentTarget instanceof HTMLElement) {
+      event.currentTarget.blur();
+    }
+
     if (!document.fullscreenElement) {
       void document.documentElement.requestFullscreen().catch(() => {
         // Fullscreen may be unavailable outside a direct user interaction.
